@@ -22,14 +22,15 @@ export async function POST(request: NextRequest) {
     };
 
     const token = createSessionToken(sessionPayload as unknown as Record<string, unknown>, 48);
-    const response = NextResponse.json({ success: true });
+    const isProd = process.env.NODE_ENV === "production";
+    const response = NextResponse.json({ success: true, token });
 
     response.cookies.set({
       name: ADMIN_COOKIE_NAME,
       value: token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
       maxAge: 48 * 3600, // 2 days
       path: "/",
     });

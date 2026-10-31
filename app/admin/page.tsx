@@ -83,10 +83,35 @@ export default function AdminDashboardPage() {
     checkAdmin();
   }, []);
 
+  function isShopifyEmbedded(): boolean {
+    if (typeof window === "undefined") return false;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("shop") || params.get("host") || params.get("embedded") === "1") {
+        sessionStorage.setItem("qs_shopify_embedded", "1");
+        return true;
+      }
+      if (sessionStorage.getItem("qs_shopify_embedded") === "1") return true;
+      return window.self !== window.top;
+    } catch {
+      return true;
+    }
+  }
+
+  async function adminFetch(url: string, init?: RequestInit) {
+    const headers = new Headers(init?.headers || {});
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("qs_admin_token");
+      if (token) headers.set("x-admin-token", token);
+      if (isShopifyEmbedded()) headers.set("x-shopify-embedded", "1");
+    }
+    return fetch(url, { ...init, headers });
+  }
+
   async function checkAdmin() {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/salespeople");
+      const res = await adminFetch("/api/admin/salespeople");
       if (res.ok) {
         setIsAdmin(true);
         loadAllData();
@@ -103,9 +128,9 @@ export default function AdminDashboardPage() {
   async function loadAllData() {
     try {
       const [repsRes, commsRes, paysRes] = await Promise.all([
-        fetch("/api/admin/salespeople"),
-        fetch("/api/admin/commissions"),
-        fetch("/api/admin/payouts"),
+        adminFetch("/api/admin/salespeople"),
+        adminFetch("/api/admin/commissions"),
+        adminFetch("/api/admin/payouts"),
       ]);
       if (repsRes.ok) {
         const d = await repsRes.json();
@@ -139,6 +164,9 @@ export default function AdminDashboardPage() {
         setLoginError(data.error || "Incorrect passcode");
         return;
       }
+      if (data.token && typeof window !== "undefined") {
+        localStorage.setItem("qs_admin_token", data.token);
+      }
       setIsAdmin(true);
       await loadAllData();
     } catch {
@@ -150,13 +178,17 @@ export default function AdminDashboardPage() {
 
   async function handleLogout() {
     await fetch("/api/auth/admin/logout", { method: "POST" });
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("qs_admin_token");
+      sessionStorage.removeItem("qs_shopify_embedded");
+    }
     setIsAdmin(false);
     setPasscode("");
   }
 
   async function handleApproveCommission(id: string) {
     try {
-      const res = await fetch("/api/admin/commissions", {
+      const res = await adminFetch("/api/admin/commissions", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [id], action: "APPROVE" }),
@@ -176,7 +208,7 @@ export default function AdminDashboardPage() {
     const pendingIds = commissions.filter((c) => c.status === "PENDING").map((c) => c.id);
     if (pendingIds.length === 0) return;
     try {
-      const res = await fetch("/api/admin/commissions", {
+      const res = await adminFetch("/api/admin/commissions", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: pendingIds, action: "APPROVE" }),
@@ -194,7 +226,7 @@ export default function AdminDashboardPage() {
 
   async function handleToggleRepActive(rep: Salesperson) {
     try {
-      const res = await fetch("/api/admin/salespeople", {
+      const res = await adminFetch("/api/admin/salespeople", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: rep.id, is_active: !rep.is_active }),
@@ -213,7 +245,7 @@ export default function AdminDashboardPage() {
   async function handleResetPin(rep: Salesperson) {
     if (!confirm(`Reset PIN for ${rep.name} (${rep.code})? They will be prompted to set a new PIN on next login.`)) return;
     try {
-      const res = await fetch("/api/admin/salespeople", {
+      const res = await adminFetch("/api/admin/salespeople", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: rep.id, resetPin: true }),
@@ -241,7 +273,7 @@ export default function AdminDashboardPage() {
     }
 
     try {
-      const res = await fetch("/api/admin/salespeople", {
+      const res = await adminFetch("/api/admin/salespeople", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -285,7 +317,7 @@ export default function AdminDashboardPage() {
     }
 
     try {
-      const res = await fetch("/api/admin/payouts", {
+      const res = await adminFetch("/api/admin/payouts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

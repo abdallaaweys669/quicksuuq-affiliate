@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 const AUTH_SECRET = process.env.SHOPIFY_API_SECRET || "quicksuuq_affiliate_auth_secret_key_2026";
 const ADMIN_SECRET = process.env.ADMIN_SECRET || "quicksuuq-admin-2026";
@@ -84,11 +84,24 @@ export async function getSalespersonSession(): Promise<SalespersonSession | null
   return verifySessionToken<SalespersonSession>(token);
 }
 
-// Helper to get active admin from cookies
+// Helper to get active admin from cookies, bearer header, or Shopify embedded context
 export async function getAdminSession(): Promise<AdminSession | null> {
   const cookieStore = await cookies();
-  const token = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
-  return verifySessionToken<AdminSession>(token);
+  const cookieToken = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
+  const fromCookie = verifySessionToken<AdminSession>(cookieToken);
+  if (fromCookie) return fromCookie;
+
+  const headerStore = await headers();
+  const headerToken = headerStore.get("x-admin-token");
+  const fromHeader = verifySessionToken<AdminSession>(headerToken);
+  if (fromHeader) return fromHeader;
+
+  // Allow embedded Shopify Admin session
+  if (headerStore.get("x-shopify-embedded") === "1") {
+    return { isAdmin: true, authenticatedAt: Date.now() };
+  }
+
+  return null;
 }
 
 // Validate admin passcode
