@@ -717,80 +717,83 @@ export default function AdminDashboardPage() {
             <h3>Add New Salesperson</h3>
             <p className="modal-sub">Create an affiliate referral code and assign a commission rate.</p>
             <form onSubmit={handleAddSalesperson} className="modal-form">
-              <div className="form-group">
-                <label>Full Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Hassan Omar"
-                  value={newRepName}
-                  onChange={(e) => setNewRepName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>Registered Email (Unique Login)</label>
-                <input
-                  type="email"
-                  placeholder="e.g. hassan@example.com"
-                  value={newRepEmail}
-                  onChange={(e) => setNewRepEmail(e.target.value)}
-                  required
-                />
-                <span className="field-hint">Unique email used by salesperson to log in to the portal.</span>
-              </div>
-              <div className="form-group">
-                <label>Unique Referral Code</label>
-                <input
-                  type="text"
-                  placeholder="e.g. HASSAN50"
-                  value={newRepCode}
-                  onChange={(e) => setNewRepCode(e.target.value.toUpperCase())}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <div className="form-label-row">
-                  <label>Somali Phone Number (EVC Plus)</label>
-                  <span className="compulsory-badge">Compulsory</span>
+              <div className="modal-grid-2">
+                <div className="form-group">
+                  <label>Full Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Hassan Omar"
+                    value={newRepName}
+                    onChange={(e) => setNewRepName(e.target.value)}
+                    required
+                  />
                 </div>
-                <input
-                  type="tel"
-                  placeholder="e.g. 615552000 or +252615552000"
-                  value={newRepPhone}
-                  onChange={(e) => setNewRepPhone(e.target.value)}
-                  required
-                />
-                <span className="field-hint">Mandatory for sending mobile money commissions via EVC Plus.</span>
+                <div className="form-group">
+                  <label>Unique Referral Code</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. HASSAN50"
+                    value={newRepCode}
+                    onChange={(e) => setNewRepCode(e.target.value.toUpperCase())}
+                    required
+                  />
+                </div>
               </div>
-              <div className="form-group">
-                <label>Commission Rate (Default: 0.02 = 2%)</label>
-                <input
-                  type="number"
-                  step="0.005"
-                  min="0"
-                  max="1"
-                  value={newRepRate}
-                  onChange={(e) => setNewRepRate(e.target.value)}
-                  required
-                />
+              <div className="modal-grid-2">
+                <div className="form-group">
+                  <label>Registered Email (Login)</label>
+                  <input
+                    type="email"
+                    placeholder="e.g. hassan@example.com"
+                    value={newRepEmail}
+                    onChange={(e) => setNewRepEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <div className="form-label-row">
+                    <label>Somali Phone (EVC Plus)</label>
+                    <span className="compulsory-badge">Compulsory</span>
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder="e.g. +252615552000"
+                    value={newRepPhone}
+                    onChange={(e) => setNewRepPhone(e.target.value)}
+                    required
+                  />
+                </div>
               </div>
-              <div className="form-group">
-                <label>Initial 4-to-6 Digit PIN (Optional)</label>
-                <input
-                  type="password"
-                  maxLength={6}
-                  inputMode="numeric"
-                  placeholder="e.g. 1234 (leave blank for rep to choose)"
-                  value={newRepPin}
-                  onChange={(e) => setNewRepPin(e.target.value.replace(/\D/g, ""))}
-                />
-                <span className="field-hint">If empty, the rep chooses their PIN on their first login.</span>
+              <div className="modal-grid-2">
+                <div className="form-group">
+                  <label>Commission Rate (0.02 = 2%)</label>
+                  <input
+                    type="number"
+                    step="0.005"
+                    min="0"
+                    max="1"
+                    value={newRepRate}
+                    onChange={(e) => setNewRepRate(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Initial PIN (Optional)</label>
+                  <input
+                    type="password"
+                    maxLength={6}
+                    inputMode="numeric"
+                    placeholder="e.g. 1234 (or blank)"
+                    value={newRepPin}
+                    onChange={(e) => setNewRepPin(e.target.value.replace(/\D/g, ""))}
+                  />
+                </div>
               </div>
               <div className="modal-actions">
                 <button type="button" onClick={() => setShowAddRep(false)} className="btn-secondary">
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary">
+                <button type="submit" className="btn-primary" style={{ height: "40px", padding: "0 20px" }}>
                   Save Salesperson
                 </button>
               </div>
