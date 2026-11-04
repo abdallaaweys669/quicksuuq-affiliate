@@ -15,7 +15,7 @@ const corsHeaders = {
 };
 
 // 20 Provisional Delivery Areas & Categories (A: $1.50, B: $2.00, C: $3.00, D: $3.50)
-export const DELIVERY_AREAS: Record<string, { category: "A" | "B" | "C" | "D"; fee: number }> = {
+const DELIVERY_AREAS: Record<string, { category: "A" | "B" | "C" | "D"; fee: number }> = {
   // Category A — $1.50
   "Howlwadaag": { category: "A", fee: 1.50 },
   "Warta Nabadda": { category: "A", fee: 1.50 },
