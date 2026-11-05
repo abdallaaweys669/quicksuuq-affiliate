@@ -71,7 +71,7 @@ const PRODUCT_SPECS: Record<string, { weightKg: number; volumeL: number }> = {
   "Wireless Stereo Earbuds Pro TWS": { weightKg: 0.15, volumeL: 0 },
 };
 
-function recommendVehicle(totalWeightKg: number, subtotalUsd: number): {
+function recommendVehicle(totalWeightKg: number): {
   vehicleTag: string;
   vehicleLabel: string;
 } {
@@ -87,7 +87,7 @@ function recommendVehicle(totalWeightKg: number, subtotalUsd: number): {
       vehicleLabel: "Fekon Cargo (Capacity: 800 kg)",
     };
   }
-  if (totalWeightKg > 20 || subtotalUsd > 100) {
+  if (totalWeightKg > 20) {
     return {
       vehicleTag: "Bajaj",
       vehicleLabel: "Bajaj (Capacity: 300 kg)",
@@ -230,15 +230,15 @@ export async function POST(request: NextRequest) {
     totalSolidKg = Number(totalSolidKg.toFixed(2));
     totalLiquidLitres = Number(totalLiquidLitres.toFixed(2));
 
-    // 4. Calculate Delivery Fee (Base Category A-D Fee + $1.00 Heavy Order Surcharge if > $100 or > 20 kg)
+    // 4. Calculate Delivery Fee (Base Category A-D Fee + $1.00 Heavy Order Surcharge if > 100 kg)
     const areaInfo = DELIVERY_AREAS[deliveryArea];
     const baseDeliveryFee = areaInfo.fee;
-    const isHeavyOrder = subtotalUsd > 100 || totalWeightKg > 20;
+    const isHeavyOrder = totalWeightKg > 100;
     const heavyOrderSurcharge = isHeavyOrder ? 1.00 : 0.00;
     const finalDeliveryFee = Number((baseDeliveryFee + heavyOrderSurcharge).toFixed(2));
 
     // 5. Internal Vehicle Recommendation (Staff-Only)
-    const { vehicleTag, vehicleLabel } = recommendVehicle(totalWeightKg, subtotalUsd);
+    const { vehicleTag, vehicleLabel } = recommendVehicle(totalWeightKg);
 
     // Format Customer Name into first_name / last_name for Shopify
     const nameParts = customerName.split(/\s+/);
@@ -320,12 +320,6 @@ export async function POST(request: NextRequest) {
         line_items: lineItems,
         phone: formattedPhone,
         email: email || undefined,
-        customer: {
-          first_name: firstName,
-          last_name: lastName,
-          phone: formattedPhone,
-          email: email || undefined,
-        },
         shipping_address: {
           first_name: firstName,
           last_name: lastName,
@@ -357,12 +351,12 @@ export async function POST(request: NextRequest) {
         gateway: "EVC Plus / Zaad / Sahal (Mobile Money)",
         payment_gateway_names: ["EVC Plus / Zaad / Sahal (Mobile Money)"],
         tags: orderTagList.join(", "),
-        note: `Area: ${deliveryArea} (Cat ${areaInfo.category}) | Fee: $${finalDeliveryFee.toFixed(2)} | Weight: ${weightSummaryText} | Recommended Vehicle: ${vehicleLabel} | Phone: ${formattedPhone}`,
+        note: `Customer: ${customerName} | Area: ${deliveryArea} (Cat ${areaInfo.category}) | Fee: $${finalDeliveryFee.toFixed(2)} | Weight: ${weightSummaryText} | Recommended Vehicle: ${vehicleLabel} | Phone: ${formattedPhone}`,
         note_attributes: noteAttributes,
       },
     };
 
-    const shopifyRes = await fetch(
+    let shopifyRes = await fetch(
       `https://${SHOPIFY_STORE}/admin/api/2025-01/orders.json`,
       {
         method: "POST",
@@ -374,11 +368,43 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    const data = await shopifyRes.json();
+    let data = await shopifyRes.json();
+
+    // If Shopify rejects top-level phone/email due to existing customer record conflict (422),
+    // retry without top-level phone/email while preserving them in shipping_address and note_attributes
+    if (!shopifyRes.ok || !data.order) {
+      console.warn("[EVC Checkout] Retrying without top-level customer phone/email conflict:", data);
+      const fallbackPayload = {
+        order: {
+          ...orderPayload.order,
+          phone: undefined,
+          email: undefined,
+        },
+      };
+      shopifyRes = await fetch(
+        `https://${SHOPIFY_STORE}/admin/api/2025-01/orders.json`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": SHOPIFY_TOKEN,
+          },
+          body: JSON.stringify(fallbackPayload),
+        }
+      );
+      data = await shopifyRes.json();
+    }
+
     if (!shopifyRes.ok || !data.order) {
       console.error("[EVC Checkout] Shopify order creation failed:", data);
+      const errMsg =
+        typeof data.errors === "string"
+          ? data.errors
+          : data.errors
+          ? JSON.stringify(data.errors)
+          : "Failed to create order on Shopify";
       return NextResponse.json(
-        { error: data.errors || "Failed to create order on Shopify" },
+        { error: errMsg },
         { status: shopifyRes.status || 500, headers: corsHeaders }
       );
     }
