@@ -277,8 +277,6 @@ export async function POST(request: NextRequest) {
       { name: "Estimated Order Weight", value: weightSummaryText },
       { name: "Weight / Volume Check", value: missingWeightStatus },
       { name: "Recommended Vehicle", value: vehicleLabel },
-      { name: "Assigned Driver / Vehicle", value: "Unassigned (Pending Dispatch)" },
-      { name: "Delivery Status", value: "Pending Dispatch" },
       { name: "Payment Status", value: "Paid Online (EVC Plus)" },
     ];
 
