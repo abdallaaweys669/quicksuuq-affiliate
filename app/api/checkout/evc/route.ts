@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { processPaidOrder } from "@/lib/affiliate";
 import { normalizeSomaliPhone } from "@/lib/shopify";
+import { getDeliveryConfig } from "@/lib/delivery-db";
 
 export const runtime = "nodejs";
 
@@ -133,7 +134,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!deliveryArea || !DELIVERY_AREAS[deliveryArea]) {
+    const deliveryConfig = await getDeliveryConfig().catch(() => null);
+    const dbArea = deliveryConfig?.areas.find(
+      (a) => a.is_active && a.name.toLowerCase() === deliveryArea.toLowerCase()
+    );
+    const fallbackArea = DELIVERY_AREAS[deliveryArea];
+
+    if (!deliveryArea || (!dbArea && !fallbackArea)) {
       return NextResponse.json(
         { error: "Please select a valid Delivery Area" },
         { status: 400, headers: corsHeaders }
@@ -230,15 +237,28 @@ export async function POST(request: NextRequest) {
     totalSolidKg = Number(totalSolidKg.toFixed(2));
     totalLiquidLitres = Number(totalLiquidLitres.toFixed(2));
 
-    // 4. Calculate Delivery Fee (Base Category A-D Fee + $1.00 Heavy Order Surcharge if > 100 kg)
-    const areaInfo = DELIVERY_AREAS[deliveryArea];
+    // 4. Calculate Delivery Fee (Base Category A-D Fee + Heavy Order Surcharge from Admin DB)
+    const areaInfo = dbArea
+      ? { category: dbArea.category, fee: Number(dbArea.fee_usd) }
+      : fallbackArea;
     const baseDeliveryFee = areaInfo.fee;
-    const isHeavyOrder = totalWeightKg > 100;
-    const heavyOrderSurcharge = isHeavyOrder ? 1.00 : 0.00;
+    const heavyThresholdKg = deliveryConfig?.settings.heavy_weight_threshold_kg ?? 100;
+    const heavySurchargeVal = deliveryConfig?.settings.heavy_surcharge_usd ?? 1.00;
+    const isHeavyOrder = totalWeightKg > heavyThresholdKg;
+    const heavyOrderSurcharge = isHeavyOrder ? heavySurchargeVal : 0.00;
     const finalDeliveryFee = Number((baseDeliveryFee + heavyOrderSurcharge).toFixed(2));
 
-    // 5. Internal Vehicle Recommendation (Staff-Only)
-    const { vehicleTag, vehicleLabel } = recommendVehicle(totalWeightKg);
+    // 5. Internal Vehicle Recommendation (Uses Admin DB Vehicles if configured)
+    let { vehicleTag, vehicleLabel } = recommendVehicle(totalWeightKg);
+    if (deliveryConfig && deliveryConfig.vehicles.length > 0) {
+      const matchedVehicle = deliveryConfig.vehicles.find(
+        (v) => v.is_active && totalWeightKg <= v.max_weight_kg
+      );
+      if (matchedVehicle) {
+        vehicleTag = matchedVehicle.name.split("(")[0].trim().replace(/\s+/g, "-");
+        vehicleLabel = `${matchedVehicle.name} (Capacity: ${matchedVehicle.max_weight_kg} kg)`;
+      }
+    }
 
     // Format Customer Name into first_name / last_name for Shopify
     const nameParts = customerName.split(/\s+/);
