@@ -353,6 +353,38 @@ export async function POST(request: NextRequest) {
         tags: orderTagList.join(", "),
         note: `Customer: ${customerName} | Area: ${deliveryArea} (Cat ${areaInfo.category}) | Fee: $${finalDeliveryFee.toFixed(2)} | Weight: ${weightSummaryText} | Recommended Vehicle: ${vehicleLabel} | Phone: ${formattedPhone}`,
         note_attributes: noteAttributes,
+        metafields: [
+          {
+            namespace: "quicksuuq",
+            key: "assigned_driver",
+            type: "single_line_text_field",
+            value: "Unassigned (Pending Dispatch)",
+          },
+          {
+            namespace: "quicksuuq",
+            key: "delivery_status",
+            type: "single_line_text_field",
+            value: "Pending Dispatch",
+          },
+          {
+            namespace: "quicksuuq",
+            key: "recommended_vehicle",
+            type: "single_line_text_field",
+            value: vehicleLabel,
+          },
+          {
+            namespace: "quicksuuq",
+            key: "delivery_area",
+            type: "single_line_text_field",
+            value: `${deliveryArea} — ${feeBreakdownText}`,
+          },
+          {
+            namespace: "quicksuuq",
+            key: "order_weight",
+            type: "single_line_text_field",
+            value: weightSummaryText,
+          },
+        ],
       },
     };
 
@@ -371,7 +403,7 @@ export async function POST(request: NextRequest) {
     let data = await shopifyRes.json();
 
     // If Shopify rejects top-level phone/email due to existing customer record conflict (422),
-    // retry without top-level phone/email while preserving them in shipping_address and note_attributes
+    // retry with customer first/last name only while preserving phone/email in shipping_address and note_attributes
     if (!shopifyRes.ok || !data.order) {
       console.warn("[EVC Checkout] Retrying without top-level customer phone/email conflict:", data);
       const fallbackPayload = {
@@ -379,6 +411,10 @@ export async function POST(request: NextRequest) {
           ...orderPayload.order,
           phone: undefined,
           email: undefined,
+          customer: {
+            first_name: firstName,
+            last_name: lastName,
+          },
         },
       };
       shopifyRes = await fetch(
