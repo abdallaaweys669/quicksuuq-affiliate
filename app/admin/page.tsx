@@ -123,6 +123,16 @@ export default function AdminDashboardPage() {
   const [editDriverVehicle, setEditDriverVehicle] = useState("");
   const [editDriverPlate, setEditDriverPlate] = useState("");
   const [editDriverStatus, setEditDriverStatus] = useState("Available");
+
+  // Delivery Search, Filter & Modal states
+  const [showAddAreaModal, setShowAddAreaModal] = useState(false);
+  const [showAddVehicleModal, setShowAddVehicleModal] = useState(false);
+  const [showAddDriverModal, setShowAddDriverModal] = useState(false);
+  const [areaSearch, setAreaSearch] = useState("");
+  const [areaCatFilter, setAreaCatFilter] = useState("ALL");
+  const [vehicleSearch, setVehicleSearch] = useState("");
+  const [driverSearch, setDriverSearch] = useState("");
+  const [driverVehicleFilter, setDriverVehicleFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [feedbackMsg, setFeedbackMsg] = useState("");
 
@@ -254,6 +264,7 @@ export default function AdminDashboardPage() {
       }),
     });
     if (res.ok) {
+      setShowAddAreaModal(false);
       setNewAreaName("");
       await loadAllData();
       showFeedback(`Added delivery area ${newAreaName}!`);
@@ -327,6 +338,7 @@ export default function AdminDashboardPage() {
       }),
     });
     if (res.ok) {
+      setShowAddVehicleModal(false);
       setNewVehicleName("");
       await loadAllData();
       showFeedback(`Added vehicle ${newVehicleName}!`);
@@ -380,6 +392,7 @@ export default function AdminDashboardPage() {
       }),
     });
     if (res.ok) {
+      setShowAddDriverModal(false);
       setNewDriverName("");
       setNewDriverPhone("");
       setNewDriverPlate("");
@@ -1070,72 +1083,50 @@ export default function AdminDashboardPage() {
             {/* SUB-TAB 1: DELIVERY AREAS CRUD */}
             {deliverySubTab === "areas" && (
               <div>
-                <form
-                  onSubmit={handleAddArea}
+                {/* Search & Filter Bar + Add Area Button */}
+                <div
                   style={{
                     display: "flex",
                     flexWrap: "wrap",
                     gap: "10px",
-                    alignItems: "flex-end",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                     marginBottom: "16px",
-                    background: "#f0fdf4",
-                    padding: "14px",
+                    background: "#f8fafc",
+                    padding: "12px 14px",
                     borderRadius: "8px",
-                    border: "1px solid #bbf7d0",
+                    border: "1px solid #e2e8f0",
                   }}
                 >
-                  <div style={{ flex: "1 1 200px" }}>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
-                      New Area / District Name
-                    </label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", flex: "1 1 320px" }}>
                     <input
                       type="text"
-                      placeholder="e.g. KM4 or Darusalaam"
-                      value={newAreaName}
-                      onChange={(e) => setNewAreaName(e.target.value)}
-                      required
-                      style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
+                      placeholder="🔍 Search area name (e.g. Hodan, Garasbaaley)..."
+                      value={areaSearch}
+                      onChange={(e) => setAreaSearch(e.target.value)}
+                      style={{ flex: "1 1 220px", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
                     />
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
-                      Category
-                    </label>
                     <select
-                      value={newAreaCategory}
-                      onChange={(e) => {
-                        const cat = e.target.value;
-                        setNewAreaCategory(cat);
-                        if (cat === "A") setNewAreaFee("1.50");
-                        if (cat === "B") setNewAreaFee("2.00");
-                        if (cat === "C") setNewAreaFee("3.00");
-                        if (cat === "D") setNewAreaFee("3.50");
-                      }}
-                      style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
+                      value={areaCatFilter}
+                      onChange={(e) => setAreaCatFilter(e.target.value)}
+                      style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", background: "#fff" }}
                     >
-                      <option value="A">Category A</option>
-                      <option value="B">Category B</option>
-                      <option value="C">Category C</option>
-                      <option value="D">Category D</option>
+                      <option value="ALL">All Categories</option>
+                      <option value="A">Category A ($1.50)</option>
+                      <option value="B">Category B ($2.00)</option>
+                      <option value="C">Category C ($3.00)</option>
+                      <option value="D">Category D ($3.50)</option>
                     </select>
                   </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
-                      Delivery Fee ($)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.25"
-                      value={newAreaFee}
-                      onChange={(e) => setNewAreaFee(e.target.value)}
-                      required
-                      style={{ width: "110px", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
-                    />
-                  </div>
-                  <button type="submit" className="btn-action primary" style={{ height: "36px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddAreaModal(true)}
+                    className="btn-action primary"
+                    style={{ height: "36px" }}
+                  >
                     + Add Area
                   </button>
-                </form>
+                </div>
 
                 <div className="table-responsive">
                   <table className="data-table">
@@ -1149,90 +1140,100 @@ export default function AdminDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {deliveryAreas.map((a) => (
-                        <tr key={a.id}>
-                          <td className="bold-cell">
-                            {editingAreaId === a.id ? (
-                              <input
-                                type="text"
-                                value={editAreaName}
-                                onChange={(e) => setEditAreaName(e.target.value)}
-                                style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                              />
-                            ) : (
-                              a.name
-                            )}
-                          </td>
-                          <td>
-                            {editingAreaId === a.id ? (
-                              <select
-                                value={editAreaCategory}
-                                onChange={(e) => setEditAreaCategory(e.target.value)}
-                                style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                              >
-                                <option value="A">Category A</option>
-                                <option value="B">Category B</option>
-                                <option value="C">Category C</option>
-                                <option value="D">Category D</option>
-                              </select>
-                            ) : (
-                              <span className="code-tag">Category {a.category}</span>
-                            )}
-                          </td>
-                          <td className="bold-cell green-cell">
-                            {editingAreaId === a.id ? (
-                              <input
-                                type="number"
-                                step="0.25"
-                                value={editAreaFee}
-                                onChange={(e) => setEditAreaFee(e.target.value)}
-                                style={{ width: "90px", padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                              />
-                            ) : (
-                              `$${Number(a.fee_usd).toFixed(2)}`
-                            )}
-                          </td>
-                          <td>
-                            <span className={`status-pill ${a.is_active ? "active-pill" : "voided"}`}>
-                              {a.is_active ? "Active" : "Disabled"}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="btn-group">
+                      {deliveryAreas
+                        .filter((a) => {
+                          const matchSearch =
+                            !areaSearch.trim() ||
+                            a.name.toLowerCase().includes(areaSearch.trim().toLowerCase());
+                          const matchCat = areaCatFilter === "ALL" || a.category === areaCatFilter;
+                          return matchSearch && matchCat;
+                        })
+                        .map((a) => (
+                          <tr key={a.id}>
+                            <td className="bold-cell">
                               {editingAreaId === a.id ? (
-                                <>
-                                  <button onClick={() => handleSaveAreaEdit(a)} className="btn-tiny approve">
-                                    Save
-                                  </button>
-                                  <button onClick={() => setEditingAreaId(null)} className="btn-tiny">
-                                    Cancel
-                                  </button>
-                                </>
+                                <input
+                                  type="text"
+                                  value={editAreaName}
+                                  onChange={(e) => setEditAreaName(e.target.value)}
+                                  style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
+                                />
                               ) : (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      setEditingAreaId(a.id);
-                                      setEditAreaName(a.name);
-                                      setEditAreaCategory(a.category);
-                                      setEditAreaFee(Number(a.fee_usd).toFixed(2));
-                                    }}
-                                    className="btn-tiny"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button onClick={() => handleToggleAreaActive(a)} className="btn-tiny">
-                                    {a.is_active ? "Disable" : "Enable"}
-                                  </button>
-                                  <button onClick={() => handleDeleteArea(a)} className="btn-tiny" style={{ color: "#dc2626" }}>
-                                    Delete
-                                  </button>
-                                </>
+                                a.name
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td>
+                              {editingAreaId === a.id ? (
+                                <select
+                                  value={editAreaCategory}
+                                  onChange={(e) => setEditAreaCategory(e.target.value)}
+                                  style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
+                                >
+                                  <option value="A">Category A</option>
+                                  <option value="B">Category B</option>
+                                  <option value="C">Category C</option>
+                                  <option value="D">Category D</option>
+                                </select>
+                              ) : (
+                                <span style={{ fontSize: "14px", fontWeight: 500, color: "#334155" }}>
+                                  Category {a.category}
+                                </span>
+                              )}
+                            </td>
+                            <td className="bold-cell green-cell">
+                              {editingAreaId === a.id ? (
+                                <input
+                                  type="number"
+                                  step="0.25"
+                                  value={editAreaFee}
+                                  onChange={(e) => setEditAreaFee(e.target.value)}
+                                  style={{ width: "90px", padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
+                                />
+                              ) : (
+                                `$${Number(a.fee_usd).toFixed(2)}`
+                              )}
+                            </td>
+                            <td>
+                              <span className={`status-pill ${a.is_active ? "active-pill" : "voided"}`}>
+                                {a.is_active ? "Active" : "Disabled"}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="btn-group">
+                                {editingAreaId === a.id ? (
+                                  <>
+                                    <button onClick={() => handleSaveAreaEdit(a)} className="btn-tiny approve">
+                                      Save
+                                    </button>
+                                    <button onClick={() => setEditingAreaId(null)} className="btn-tiny">
+                                      Cancel
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setEditingAreaId(a.id);
+                                        setEditAreaName(a.name);
+                                        setEditAreaCategory(a.category);
+                                        setEditAreaFee(Number(a.fee_usd).toFixed(2));
+                                      }}
+                                      className="btn-tiny"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button onClick={() => handleToggleAreaActive(a)} className="btn-tiny">
+                                      {a.is_active ? "Disable" : "Enable"}
+                                    </button>
+                                    <button onClick={() => handleDeleteArea(a)} className="btn-tiny" style={{ color: "#dc2626" }}>
+                                      Delete
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
@@ -1242,62 +1243,37 @@ export default function AdminDashboardPage() {
             {/* SUB-TAB 2: VEHICLES CRUD */}
             {deliverySubTab === "vehicles" && (
               <div>
-                <form
-                  onSubmit={handleAddVehicle}
+                {/* Search Bar + Add Vehicle Button */}
+                <div
                   style={{
                     display: "flex",
                     flexWrap: "wrap",
                     gap: "10px",
-                    alignItems: "flex-end",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                     marginBottom: "16px",
                     background: "#f8fafc",
-                    padding: "14px",
+                    padding: "12px 14px",
                     borderRadius: "8px",
-                    border: "1px solid #cbd5e1",
+                    border: "1px solid #e2e8f0",
                   }}
                 >
-                  <div style={{ flex: "1 1 200px" }}>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
-                      Vehicle Type Name
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Mini Truck or Damas"
-                      value={newVehicleName}
-                      onChange={(e) => setNewVehicleName(e.target.value)}
-                      required
-                      style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
-                      Min Weight (kg)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      value={newVehicleMinKg}
-                      onChange={(e) => setNewVehicleMinKg(e.target.value)}
-                      style={{ width: "110px", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
-                      Max Capacity (kg)
-                    </label>
-                    <input
-                      type="number"
-                      step="1"
-                      value={newVehicleMaxKg}
-                      onChange={(e) => setNewVehicleMaxKg(e.target.value)}
-                      required
-                      style={{ width: "120px", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
-                    />
-                  </div>
-                  <button type="submit" className="btn-action primary" style={{ height: "36px" }}>
+                  <input
+                    type="text"
+                    placeholder="🔍 Search vehicle type (e.g. Fekon, Bajaj)..."
+                    value={vehicleSearch}
+                    onChange={(e) => setVehicleSearch(e.target.value)}
+                    style={{ flex: "1 1 240px", maxWidth: "380px", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAddVehicleModal(true)}
+                    className="btn-action primary"
+                    style={{ height: "36px" }}
+                  >
                     + Add Vehicle
                   </button>
-                </form>
+                </div>
 
                 <div className="table-responsive">
                   <table className="data-table">
@@ -1310,79 +1286,85 @@ export default function AdminDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {deliveryVehicles.map((v) => (
-                        <tr key={v.id}>
-                          <td className="bold-cell">
-                            {editingVehicleId === v.id ? (
-                              <input
-                                type="text"
-                                value={editVehicleName}
-                                onChange={(e) => setEditVehicleName(e.target.value)}
-                                style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                              />
-                            ) : (
-                              v.name
-                            )}
-                          </td>
-                          <td>
-                            {editingVehicleId === v.id ? (
-                              <input
-                                type="number"
-                                step="0.5"
-                                value={editVehicleMinKg}
-                                onChange={(e) => setEditVehicleMinKg(e.target.value)}
-                                style={{ width: "90px", padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                              />
-                            ) : (
-                              `${v.min_weight_kg} kg`
-                            )}
-                          </td>
-                          <td className="bold-cell teal-cell">
-                            {editingVehicleId === v.id ? (
-                              <input
-                                type="number"
-                                step="1"
-                                value={editVehicleMaxKg}
-                                onChange={(e) => setEditVehicleMaxKg(e.target.value)}
-                                style={{ width: "100px", padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                              />
-                            ) : (
-                              `Up to ${v.max_weight_kg} kg`
-                            )}
-                          </td>
-                          <td>
-                            <div className="btn-group">
+                      {deliveryVehicles
+                        .filter(
+                          (v) =>
+                            !vehicleSearch.trim() ||
+                            v.name.toLowerCase().includes(vehicleSearch.trim().toLowerCase())
+                        )
+                        .map((v) => (
+                          <tr key={v.id}>
+                            <td className="bold-cell">
                               {editingVehicleId === v.id ? (
-                                <>
-                                  <button onClick={() => handleSaveVehicleEdit(v)} className="btn-tiny approve">
-                                    Save
-                                  </button>
-                                  <button onClick={() => setEditingVehicleId(null)} className="btn-tiny">
-                                    Cancel
-                                  </button>
-                                </>
+                                <input
+                                  type="text"
+                                  value={editVehicleName}
+                                  onChange={(e) => setEditVehicleName(e.target.value)}
+                                  style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
+                                />
                               ) : (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      setEditingVehicleId(v.id);
-                                      setEditVehicleName(v.name);
-                                      setEditVehicleMinKg(String(v.min_weight_kg));
-                                      setEditVehicleMaxKg(String(v.max_weight_kg));
-                                    }}
-                                    className="btn-tiny"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button onClick={() => handleDeleteVehicle(v)} className="btn-tiny" style={{ color: "#dc2626" }}>
-                                    Delete
-                                  </button>
-                                </>
+                                v.name
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td>
+                              {editingVehicleId === v.id ? (
+                                <input
+                                  type="number"
+                                  step="0.5"
+                                  value={editVehicleMinKg}
+                                  onChange={(e) => setEditVehicleMinKg(e.target.value)}
+                                  style={{ width: "90px", padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
+                                />
+                              ) : (
+                                `${v.min_weight_kg} kg`
+                              )}
+                            </td>
+                            <td className="bold-cell teal-cell">
+                              {editingVehicleId === v.id ? (
+                                <input
+                                  type="number"
+                                  step="1"
+                                  value={editVehicleMaxKg}
+                                  onChange={(e) => setEditVehicleMaxKg(e.target.value)}
+                                  style={{ width: "100px", padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
+                                />
+                              ) : (
+                                `Up to ${v.max_weight_kg} kg`
+                              )}
+                            </td>
+                            <td>
+                              <div className="btn-group">
+                                {editingVehicleId === v.id ? (
+                                  <>
+                                    <button onClick={() => handleSaveVehicleEdit(v)} className="btn-tiny approve">
+                                      Save
+                                    </button>
+                                    <button onClick={() => setEditingVehicleId(null)} className="btn-tiny">
+                                      Cancel
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setEditingVehicleId(v.id);
+                                        setEditVehicleName(v.name);
+                                        setEditVehicleMinKg(String(v.min_weight_kg));
+                                        setEditVehicleMaxKg(String(v.max_weight_kg));
+                                      }}
+                                      className="btn-tiny"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button onClick={() => handleDeleteVehicle(v)} className="btn-tiny" style={{ color: "#dc2626" }}>
+                                      Delete
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
@@ -1395,85 +1377,52 @@ export default function AdminDashboardPage() {
                 <div style={{ fontSize: "13px", color: "#0f766e", background: "#f0fdfa", border: "1px solid #99f6e4", padding: "10px 14px", borderRadius: "8px", marginBottom: "14px" }}>
                   ✓ <strong>Auto-Synced with Shopify Orders:</strong> Any driver you add, edit, or delete here automatically updates the <strong>Assigned Driver &amp; Vehicle</strong> dropdown inside your Shopify Orders page!
                 </div>
-                <form
-                  onSubmit={handleAddDriver}
+
+                {/* Search & Vehicle Filter Bar + Register Driver Button */}
+                <div
                   style={{
                     display: "flex",
                     flexWrap: "wrap",
                     gap: "10px",
-                    alignItems: "flex-end",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                     marginBottom: "16px",
                     background: "#f8fafc",
-                    padding: "14px",
+                    padding: "12px 14px",
                     borderRadius: "8px",
-                    border: "1px solid #cbd5e1",
+                    border: "1px solid #e2e8f0",
                   }}
                 >
-                  <div style={{ flex: "1 1 180px" }}>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
-                      Driver Full Name
-                    </label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", flex: "1 1 320px" }}>
                     <input
                       type="text"
-                      placeholder="e.g. Yusuf Ali"
-                      value={newDriverName}
-                      onChange={(e) => setNewDriverName(e.target.value)}
-                      required
-                      style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
+                      placeholder="🔍 Search driver name, phone, or plate..."
+                      value={driverSearch}
+                      onChange={(e) => setDriverSearch(e.target.value)}
+                      style={{ flex: "1 1 220px", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
                     />
-                  </div>
-                  <div style={{ flex: "1 1 150px" }}>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
-                      Phone Number
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. +252615009988"
-                      value={newDriverPhone}
-                      onChange={(e) => setNewDriverPhone(e.target.value)}
-                      required
-                      style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
-                      Vehicle Type
-                    </label>
                     <select
-                      value={newDriverVehicle}
-                      onChange={(e) => setNewDriverVehicle(e.target.value)}
-                      style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
+                      value={driverVehicleFilter}
+                      onChange={(e) => setDriverVehicleFilter(e.target.value)}
+                      style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", background: "#fff" }}
                     >
+                      <option value="ALL">All Vehicles</option>
                       {deliveryVehicles.map((v) => (
                         <option key={v.id} value={v.name}>
                           {v.name}
                         </option>
                       ))}
-                      {deliveryVehicles.length === 0 && (
-                        <>
-                          <option value="Fekon (Motorbike)">Fekon (Motorbike)</option>
-                          <option value="Bajaj">Bajaj</option>
-                          <option value="Fekon Cargo">Fekon Cargo</option>
-                        </>
-                      )}
                     </select>
                   </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
-                      Plate / ID
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. BJJ-05"
-                      value={newDriverPlate}
-                      onChange={(e) => setNewDriverPlate(e.target.value)}
-                      style={{ width: "100px", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
-                    />
-                  </div>
-                  <button type="submit" className="btn-action primary" style={{ height: "36px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddDriverModal(true)}
+                    className="btn-action primary"
+                    style={{ height: "36px" }}
+                  >
                     + Register Driver
                   </button>
-                </form>
+                </div>
 
                 <div className="table-responsive">
                   <table className="data-table">
@@ -1488,106 +1437,120 @@ export default function AdminDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {deliveryDrivers.map((d) => (
-                        <tr key={d.id}>
-                          <td className="bold-cell">
-                            {editingDriverId === d.id ? (
-                              <input
-                                type="text"
-                                value={editDriverName}
-                                onChange={(e) => setEditDriverName(e.target.value)}
-                                style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                              />
-                            ) : (
-                              d.name
-                            )}
-                          </td>
-                          <td className="mono-cell">
-                            {editingDriverId === d.id ? (
-                              <input
-                                type="text"
-                                value={editDriverPhone}
-                                onChange={(e) => setEditDriverPhone(e.target.value)}
-                                style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                              />
-                            ) : (
-                              d.phone
-                            )}
-                          </td>
-                          <td>
-                            {editingDriverId === d.id ? (
-                              <input
-                                type="text"
-                                value={editDriverVehicle}
-                                onChange={(e) => setEditDriverVehicle(e.target.value)}
-                                style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                              />
-                            ) : (
-                              <span className="code-tag">{d.vehicle_type}</span>
-                            )}
-                          </td>
-                          <td>
-                            {editingDriverId === d.id ? (
-                              <input
-                                type="text"
-                                value={editDriverPlate}
-                                onChange={(e) => setEditDriverPlate(e.target.value)}
-                                style={{ width: "90px", padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                              />
-                            ) : (
-                              d.plate_number || "—"
-                            )}
-                          </td>
-                          <td>
-                            {editingDriverId === d.id ? (
-                              <select
-                                value={editDriverStatus}
-                                onChange={(e) => setEditDriverStatus(e.target.value)}
-                                style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                              >
-                                <option value="Available">Available</option>
-                                <option value="On Delivery">On Delivery</option>
-                                <option value="Off Duty">Off Duty</option>
-                              </select>
-                            ) : (
-                              <span className="status-pill active-pill">{d.status}</span>
-                            )}
-                          </td>
-                          <td>
-                            <div className="btn-group">
+                      {deliveryDrivers
+                        .filter((d) => {
+                          const q = driverSearch.trim().toLowerCase();
+                          const matchSearch =
+                            !q ||
+                            d.name.toLowerCase().includes(q) ||
+                            d.phone.toLowerCase().includes(q) ||
+                            (d.plate_number || "").toLowerCase().includes(q);
+                          const matchVehicle =
+                            driverVehicleFilter === "ALL" || d.vehicle_type === driverVehicleFilter;
+                          return matchSearch && matchVehicle;
+                        })
+                        .map((d) => (
+                          <tr key={d.id}>
+                            <td className="bold-cell">
                               {editingDriverId === d.id ? (
-                                <>
-                                  <button onClick={() => handleSaveDriverEdit(d)} className="btn-tiny approve">
-                                    Save
-                                  </button>
-                                  <button onClick={() => setEditingDriverId(null)} className="btn-tiny">
-                                    Cancel
-                                  </button>
-                                </>
+                                <input
+                                  type="text"
+                                  value={editDriverName}
+                                  onChange={(e) => setEditDriverName(e.target.value)}
+                                  style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
+                                />
                               ) : (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      setEditingDriverId(d.id);
-                                      setEditDriverName(d.name);
-                                      setEditDriverPhone(d.phone);
-                                      setEditDriverVehicle(d.vehicle_type);
-                                      setEditDriverPlate(d.plate_number || "");
-                                      setEditDriverStatus(d.status || "Available");
-                                    }}
-                                    className="btn-tiny"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button onClick={() => handleDeleteDriver(d)} className="btn-tiny" style={{ color: "#dc2626" }}>
-                                    Delete
-                                  </button>
-                                </>
+                                d.name
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="mono-cell">
+                              {editingDriverId === d.id ? (
+                                <input
+                                  type="text"
+                                  value={editDriverPhone}
+                                  onChange={(e) => setEditDriverPhone(e.target.value)}
+                                  style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
+                                />
+                              ) : (
+                                d.phone
+                              )}
+                            </td>
+                            <td>
+                              {editingDriverId === d.id ? (
+                                <input
+                                  type="text"
+                                  value={editDriverVehicle}
+                                  onChange={(e) => setEditDriverVehicle(e.target.value)}
+                                  style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
+                                />
+                              ) : (
+                                <span style={{ fontSize: "14px", fontWeight: 500, color: "#334155" }}>
+                                  {d.vehicle_type}
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              {editingDriverId === d.id ? (
+                                <input
+                                  type="text"
+                                  value={editDriverPlate}
+                                  onChange={(e) => setEditDriverPlate(e.target.value)}
+                                  style={{ width: "90px", padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
+                                />
+                              ) : (
+                                d.plate_number || "—"
+                              )}
+                            </td>
+                            <td>
+                              {editingDriverId === d.id ? (
+                                <select
+                                  value={editDriverStatus}
+                                  onChange={(e) => setEditDriverStatus(e.target.value)}
+                                  style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
+                                >
+                                  <option value="Available">Available</option>
+                                  <option value="On Delivery">On Delivery</option>
+                                  <option value="Off Duty">Off Duty</option>
+                                </select>
+                              ) : (
+                                <span className="status-pill active-pill">{d.status}</span>
+                              )}
+                            </td>
+                            <td>
+                              <div className="btn-group">
+                                {editingDriverId === d.id ? (
+                                  <>
+                                    <button onClick={() => handleSaveDriverEdit(d)} className="btn-tiny approve">
+                                      Save
+                                    </button>
+                                    <button onClick={() => setEditingDriverId(null)} className="btn-tiny">
+                                      Cancel
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setEditingDriverId(d.id);
+                                        setEditDriverName(d.name);
+                                        setEditDriverPhone(d.phone);
+                                        setEditDriverVehicle(d.vehicle_type);
+                                        setEditDriverPlate(d.plate_number || "");
+                                        setEditDriverStatus(d.status || "Available");
+                                      }}
+                                      className="btn-tiny"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button onClick={() => handleDeleteDriver(d)} className="btn-tiny" style={{ color: "#dc2626" }}>
+                                      Delete
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
@@ -1596,6 +1559,195 @@ export default function AdminDashboardPage() {
           </div>
         )}
       </section>
+
+      {/* Modal: Add Delivery Area */}
+      {showAddAreaModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <h3>Add New Delivery Area</h3>
+            <p className="modal-sub">Add a Mogadishu district and set its delivery category &amp; fee.</p>
+            <form onSubmit={handleAddArea} className="modal-form">
+              <div className="form-group">
+                <label>Area / District Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. KM4 or Darusalaam"
+                  value={newAreaName}
+                  onChange={(e) => setNewAreaName(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="modal-grid-2">
+                <div className="form-group">
+                  <label>Category</label>
+                  <select
+                    value={newAreaCategory}
+                    onChange={(e) => {
+                      const cat = e.target.value;
+                      setNewAreaCategory(cat);
+                      if (cat === "A") setNewAreaFee("1.50");
+                      if (cat === "B") setNewAreaFee("2.00");
+                      if (cat === "C") setNewAreaFee("3.00");
+                      if (cat === "D") setNewAreaFee("3.50");
+                    }}
+                  >
+                    <option value="A">Category A ($1.50)</option>
+                    <option value="B">Category B ($2.00)</option>
+                    <option value="C">Category C ($3.00)</option>
+                    <option value="D">Category D ($3.50)</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Delivery Fee ($)</label>
+                  <input
+                    type="number"
+                    step="0.25"
+                    value={newAreaFee}
+                    onChange={(e) => setNewAreaFee(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setShowAddAreaModal(false)} className="btn-secondary">
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" style={{ height: "40px", padding: "0 20px" }}>
+                  Save Area
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Add Vehicle */}
+      {showAddVehicleModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <h3>Add New Delivery Vehicle</h3>
+            <p className="modal-sub">Define a vehicle type and its minimum/maximum weight capacity in kg.</p>
+            <form onSubmit={handleAddVehicle} className="modal-form">
+              <div className="form-group">
+                <label>Vehicle Type Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Mini Truck or Damas"
+                  value={newVehicleName}
+                  onChange={(e) => setNewVehicleName(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="modal-grid-2">
+                <div className="form-group">
+                  <label>Min Weight (kg)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={newVehicleMinKg}
+                    onChange={(e) => setNewVehicleMinKg(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Max Capacity (kg)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    value={newVehicleMaxKg}
+                    onChange={(e) => setNewVehicleMaxKg(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setShowAddVehicleModal(false)} className="btn-secondary">
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" style={{ height: "40px", padding: "0 20px" }}>
+                  Save Vehicle
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Register Driver */}
+      {showAddDriverModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <h3>Register New Driver</h3>
+            <p className="modal-sub">Add a delivery driver and automatically sync them to your Shopify Orders dropdown.</p>
+            <form onSubmit={handleAddDriver} className="modal-form">
+              <div className="modal-grid-2">
+                <div className="form-group">
+                  <label>Driver Full Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Yusuf Ali"
+                    value={newDriverName}
+                    onChange={(e) => setNewDriverName(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Phone Number</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. +252615009988"
+                    value={newDriverPhone}
+                    onChange={(e) => setNewDriverPhone(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="modal-grid-2">
+                <div className="form-group">
+                  <label>Vehicle Type</label>
+                  <select
+                    value={newDriverVehicle}
+                    onChange={(e) => setNewDriverVehicle(e.target.value)}
+                  >
+                    {deliveryVehicles.map((v) => (
+                      <option key={v.id} value={v.name}>
+                        {v.name}
+                      </option>
+                    ))}
+                    {deliveryVehicles.length === 0 && (
+                      <>
+                        <option value="Fekon (Motorbike)">Fekon (Motorbike)</option>
+                        <option value="Bajaj">Bajaj</option>
+                        <option value="Fekon Cargo">Fekon Cargo</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Plate / Vehicle ID</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. BJJ-05"
+                    value={newDriverPlate}
+                    onChange={(e) => setNewDriverPlate(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setShowAddDriverModal(false)} className="btn-secondary">
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" style={{ height: "40px", padding: "0 20px" }}>
+                  Save Driver
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal: Add Salesperson */}
       {showAddRep && (
