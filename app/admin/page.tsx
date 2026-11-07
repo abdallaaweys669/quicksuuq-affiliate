@@ -75,6 +75,41 @@ interface DeliveryDriver {
   is_active: boolean;
 }
 
+type OrderWorkflowStage =
+  | "UNPAID"
+  | "NOT_PREPARED"
+  | "IN_PROCESS"
+  | "OUT_FOR_DELIVERY"
+  | "DELIVERED";
+
+interface DispatchOrder {
+  gid: string;
+  shopify_id: string;
+  order_number: string;
+  created_at: string;
+  financial_status: string;
+  fulfillment_status: string;
+  subtotal_usd: number;
+  shipping_usd: number;
+  total_usd: number;
+  customer_name: string;
+  phone: string;
+  delivery_area: string;
+  detailed_address: string;
+  order_weight: string;
+  recommended_vehicle: string;
+  assigned_driver: string;
+  delivery_status: string;
+  referral_code: string;
+  workflow_stage: OrderWorkflowStage;
+  items: Array<{
+    title: string;
+    quantity: number;
+    unit_price: number;
+    image_url: string;
+  }>;
+}
+
 export default function AdminDashboardPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [passcode, setPasscode] = useState("");
@@ -83,8 +118,15 @@ export default function AdminDashboardPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<"commissions" | "salespeople" | "payouts" | "delivery">("commissions");
+  const [activeTab, setActiveTab] = useState<"orders" | "commissions" | "salespeople" | "payouts" | "delivery">("orders");
   const [deliverySubTab, setDeliverySubTab] = useState<"areas" | "vehicles" | "drivers">("areas");
+
+  // Orders & Dispatch 5-Tab state
+  const [ordersList, setOrdersList] = useState<DispatchOrder[]>([]);
+  const [orderStageTab, setOrderStageTab] = useState<"ALL" | OrderWorkflowStage>("ALL");
+  const [orderSearch, setOrderSearch] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState<DispatchOrder | null>(null);
+  const [savingOrderDispatch, setSavingOrderDispatch] = useState(false);
 
   // Data states
   const [commissions, setCommissions] = useState<Commission[]>([]);
@@ -198,11 +240,12 @@ export default function AdminDashboardPage() {
 
   async function loadAllData() {
     try {
-      const [repsRes, commsRes, paysRes, delivRes] = await Promise.all([
+      const [repsRes, commsRes, paysRes, delivRes, ordsRes] = await Promise.all([
         adminFetch("/api/admin/salespeople"),
         adminFetch("/api/admin/commissions"),
         adminFetch("/api/admin/payouts"),
         adminFetch("/api/admin/delivery"),
+        adminFetch("/api/admin/orders"),
       ]);
       if (repsRes.ok) {
         const d = await repsRes.json();
@@ -226,8 +269,47 @@ export default function AdminDashboardPage() {
           setHeavySurchargeUsd(Number(d.settings.heavy_surcharge_usd ?? 1).toFixed(2));
         }
       }
+      if (ordsRes.ok) {
+        const d = await ordsRes.json();
+        setOrdersList(d.orders || []);
+      }
     } catch (e) {
       console.error("Error loading admin data:", e);
+    }
+  }
+
+  async function handleUpdateOrderDispatch(
+    order: DispatchOrder,
+    updates: { workflow_stage?: OrderWorkflowStage; assigned_driver?: string }
+  ) {
+    setSavingOrderDispatch(true);
+    try {
+      const res = await adminFetch("/api/admin/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gid: order.gid,
+          ...updates,
+        }),
+      });
+      if (res.ok) {
+        const nextStage = updates.workflow_stage ?? order.workflow_stage;
+        const nextDriver = updates.assigned_driver ?? order.assigned_driver;
+        const updatedOrder: DispatchOrder = {
+          ...order,
+          workflow_stage: nextStage,
+          assigned_driver: nextDriver,
+        };
+        setOrdersList((prev) =>
+          prev.map((o) => (o.gid === order.gid ? updatedOrder : o))
+        );
+        setSelectedOrder(updatedOrder);
+        showFeedback(`Updated ${order.order_number} & synced with Shopify!`);
+      } else {
+        alert("Failed to update order status.");
+      }
+    } finally {
+      setSavingOrderDispatch(false);
     }
   }
 
@@ -768,6 +850,12 @@ export default function AdminDashboardPage() {
         <div className="admin-toolbar">
           <div className="tabs-header">
             <button
+              className={`tab-btn ${activeTab === "orders" ? "active" : ""}`}
+              onClick={() => setActiveTab("orders")}
+            >
+              📦 Orders & Dispatch ({ordersList.length})
+            </button>
+            <button
               className={`tab-btn ${activeTab === "commissions" ? "active" : ""}`}
               onClick={() => setActiveTab("commissions")}
             >
@@ -833,6 +921,243 @@ export default function AdminDashboardPage() {
             )}
           </div>
         </div>
+
+        {/* Tab 0: Orders & Dispatch (5-Tab Workflow Board) */}
+        {activeTab === "orders" && (
+          <div style={{ padding: "20px 24px" }}>
+            {/* Top 5 Workflow Stage Filter Cards */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))",
+                gap: "10px",
+                marginBottom: "18px",
+              }}
+            >
+              {[
+                {
+                  key: "ALL" as const,
+                  label: "All Orders",
+                  sub: "Dhammaan Dalabyada",
+                  color: "#0f172a",
+                  bg: "#f8fafc",
+                },
+                {
+                  key: "UNPAID" as const,
+                  label: "1. Unpaid",
+                  sub: "Lacag La'aan",
+                  color: "#b45309",
+                  bg: "#fffbeb",
+                },
+                {
+                  key: "NOT_PREPARED" as const,
+                  label: "2. Paid (Not Prepared)",
+                  sub: "Aan Weli La Diyaarin",
+                  color: "#1d4ed8",
+                  bg: "#eff6ff",
+                },
+                {
+                  key: "IN_PROCESS" as const,
+                  label: "3. In Process",
+                  sub: "Diyaarin / Laguuda Jiraa",
+                  color: "#7c3aed",
+                  bg: "#f5f3ff",
+                },
+                {
+                  key: "OUT_FOR_DELIVERY" as const,
+                  label: "4. Out for Delivery",
+                  sub: "Wadada Ku Jira",
+                  color: "#0369a1",
+                  bg: "#f0f9ff",
+                },
+                {
+                  key: "DELIVERED" as const,
+                  label: "5. Delivered",
+                  sub: "La Gaarsiiyay",
+                  color: "#15803d",
+                  bg: "#f0fdf4",
+                },
+              ].map((st) => {
+                const count =
+                  st.key === "ALL"
+                    ? ordersList.length
+                    : ordersList.filter((o) => o.workflow_stage === st.key).length;
+                const isSelected = orderStageTab === st.key;
+                return (
+                  <button
+                    key={st.key}
+                    type="button"
+                    onClick={() => setOrderStageTab(st.key)}
+                    style={{
+                      textAlign: "left",
+                      padding: "12px 14px",
+                      borderRadius: "10px",
+                      border: isSelected ? `2px solid ${st.color}` : "1px solid #e2e8f0",
+                      background: isSelected ? st.bg : "#ffffff",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "12px", fontWeight: 700, color: st.color }}>{st.label}</span>
+                      <span
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 800,
+                          color: st.color,
+                          background: "#fff",
+                          padding: "2px 8px",
+                          borderRadius: "999px",
+                          border: "1px solid #e2e8f0",
+                        }}
+                      >
+                        {count}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>{st.sub}</div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Search & Refresh Bar */}
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "10px",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "16px",
+                background: "#f8fafc",
+                padding: "12px 14px",
+                borderRadius: "8px",
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              <input
+                type="text"
+                placeholder="🔍 Search order (#1048), customer name, phone, or area..."
+                value={orderSearch}
+                onChange={(e) => setOrderSearch(e.target.value)}
+                style={{
+                  flex: "1 1 280px",
+                  maxWidth: "460px",
+                  padding: "8px 12px",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                  fontSize: "13px",
+                }}
+              />
+              <button
+                type="button"
+                onClick={loadAllData}
+                className="btn-action secondary"
+                style={{ height: "36px" }}
+              >
+                ↻ Refresh Orders
+              </button>
+            </div>
+
+            {/* Clean Orders Table */}
+            <div className="table-responsive">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Order #</th>
+                    <th>Customer &amp; Phone</th>
+                    <th>Delivery Area</th>
+                    <th>Weight &amp; Vehicle</th>
+                    <th>Assigned Driver</th>
+                    <th>Total</th>
+                    <th>Stage</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ordersList
+                    .filter((o) => {
+                      const matchTab = orderStageTab === "ALL" || o.workflow_stage === orderStageTab;
+                      const q = orderSearch.trim().toLowerCase();
+                      const matchSearch =
+                        !q ||
+                        o.order_number.toLowerCase().includes(q) ||
+                        o.customer_name.toLowerCase().includes(q) ||
+                        o.phone.toLowerCase().includes(q) ||
+                        o.delivery_area.toLowerCase().includes(q);
+                      return matchTab && matchSearch;
+                    })
+                    .map((o) => {
+                      const stageBadges: Record<
+                        OrderWorkflowStage,
+                        { label: string; bg: string; color: string }
+                      > = {
+                        UNPAID: { label: "1. Unpaid", bg: "#fef3c7", color: "#b45309" },
+                        NOT_PREPARED: { label: "2. Not Prepared", bg: "#dbeafe", color: "#1d4ed8" },
+                        IN_PROCESS: { label: "3. In Process", bg: "#ede9fe", color: "#6d28d9" },
+                        OUT_FOR_DELIVERY: { label: "4. Out for Delivery", bg: "#e0f2fe", color: "#0369a1" },
+                        DELIVERED: { label: "5. Delivered", bg: "#dcfce7", color: "#15803d" },
+                      };
+                      const b = stageBadges[o.workflow_stage];
+                      return (
+                        <tr key={o.gid}>
+                          <td className="bold-cell">{o.order_number}</td>
+                          <td>
+                            <div style={{ fontWeight: 600, color: "#0f172a" }}>{o.customer_name}</div>
+                            <div style={{ fontSize: "12px", color: "#64748b" }}>{o.phone}</div>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 500, color: "#0f172a" }}>
+                              {o.delivery_area.split("—")[0].trim()}
+                            </div>
+                            <div style={{ fontSize: "12px", color: "#64748b", maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {o.detailed_address}
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 600, color: "#0f766e", fontSize: "13px" }}>
+                              {o.order_weight.split("(")[0].trim()}
+                            </div>
+                            <div style={{ fontSize: "12px", color: "#64748b" }}>
+                              {o.recommended_vehicle.split("(")[0].trim()}
+                            </div>
+                          </td>
+                          <td style={{ fontSize: "13px", color: o.assigned_driver.includes("Unassigned") ? "#94a3b8" : "#0f172a", fontWeight: 500 }}>
+                            {o.assigned_driver.includes("Unassigned") ? "Unassigned" : o.assigned_driver}
+                          </td>
+                          <td className="bold-cell">${o.total_usd.toFixed(2)}</td>
+                          <td>
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "4px 10px",
+                                borderRadius: "999px",
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                background: b.bg,
+                                color: b.color,
+                              }}
+                            >
+                              {b.label}
+                            </span>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedOrder(o)}
+                              className="btn-tiny approve"
+                            >
+                              Open / Manage
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Tab 1: Commissions Table */}
         {activeTab === "commissions" && (
@@ -1901,6 +2226,187 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Clean 1-Screen Order Details & Dispatch Manager */}
+      {selectedOrder && (
+        <div className="modal-backdrop" onClick={() => setSelectedOrder(null)}>
+          <div
+            className="modal-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "740px", width: "96%", maxHeight: "90vh", overflowY: "auto", padding: "22px" }}
+          >
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e2e8f0", paddingBottom: "12px", marginBottom: "16px" }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "20px", fontWeight: 800, color: "#0f172a" }}>
+                  Order {selectedOrder.order_number}
+                </h3>
+                <span style={{ fontSize: "12px", color: "#64748b" }}>
+                  {new Date(selectedOrder.created_at).toLocaleString()} · Total: <strong>${selectedOrder.total_usd.toFixed(2)}</strong>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedOrder(null)}
+                className="btn-secondary"
+                style={{ padding: "6px 14px", fontSize: "13px" }}
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* 5-Stage Progress Switcher (1-Click) */}
+            <div style={{ marginBottom: "18px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: "#475569", marginBottom: "8px", textTransform: "uppercase" }}>
+                1-Click Order Status (Marxaladda Dalabka)
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(125px, 1fr))", gap: "8px" }}>
+                {(
+                  [
+                    { key: "UNPAID", label: "1. Unpaid", sub: "Lacag La'aan" },
+                    { key: "NOT_PREPARED", label: "2. Not Prepared", sub: "Aan La Diyaarin" },
+                    { key: "IN_PROCESS", label: "3. In Process", sub: "Diyaarin" },
+                    { key: "OUT_FOR_DELIVERY", label: "4. Out for Delivery", sub: "Wadada" },
+                    { key: "DELIVERED", label: "5. Delivered", sub: "La Gaarsiiyay" },
+                  ] as Array<{ key: OrderWorkflowStage; label: string; sub: string }>
+                ).map((st) => {
+                  const active = selectedOrder.workflow_stage === st.key;
+                  return (
+                    <button
+                      key={st.key}
+                      type="button"
+                      disabled={savingOrderDispatch}
+                      onClick={() => handleUpdateOrderDispatch(selectedOrder, { workflow_stage: st.key })}
+                      style={{
+                        padding: "9px 10px",
+                        borderRadius: "8px",
+                        border: active ? "2px solid #0d9488" : "1px solid #cbd5e1",
+                        background: active ? "#f0fdfa" : "#fff",
+                        color: active ? "#0f766e" : "#334155",
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <div style={{ fontSize: "12px", fontWeight: 700 }}>{st.label}</div>
+                      <div style={{ fontSize: "11px", color: "#64748b" }}>{st.sub}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 2 Clean Side-by-Side Cards: Customer/Address + Logistics/Driver */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "14px", marginBottom: "18px" }}>
+              {/* Card 1: Customer & Address */}
+              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "14px" }}>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "#0f766e", textTransform: "uppercase", marginBottom: "10px" }}>
+                  👤 Customer &amp; Delivery Address
+                </div>
+                <div style={{ fontSize: "14px", marginBottom: "6px" }}>
+                  <strong>Name:</strong> {selectedOrder.customer_name}
+                </div>
+                <div style={{ fontSize: "14px", marginBottom: "6px" }}>
+                  <strong>Phone:</strong> {selectedOrder.phone}
+                </div>
+                <div style={{ fontSize: "14px", marginBottom: "6px" }}>
+                  <strong>Area &amp; Fee:</strong> {selectedOrder.delivery_area}
+                </div>
+                <div style={{ fontSize: "14px" }}>
+                  <strong>Detailed Address:</strong> {selectedOrder.detailed_address}
+                </div>
+              </div>
+
+              {/* Card 2: Weight, Vehicle & Driver Assignment */}
+              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "14px" }}>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "#15803d", textTransform: "uppercase", marginBottom: "10px" }}>
+                  🚚 Logistics &amp; Driver Assignment
+                </div>
+                <div style={{ fontSize: "14px", marginBottom: "6px" }}>
+                  <strong>Total Weight:</strong> {selectedOrder.order_weight}
+                </div>
+                <div style={{ fontSize: "14px", marginBottom: "10px" }}>
+                  <strong>Recommended Vehicle:</strong> {selectedOrder.recommended_vehicle}
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#1e293b", marginBottom: "4px" }}>
+                    Assigned Driver &amp; Vehicle:
+                  </label>
+                  <select
+                    value={selectedOrder.assigned_driver}
+                    disabled={savingOrderDispatch}
+                    onChange={(e) => {
+                      const nextDriver = e.target.value;
+                      const nextStage =
+                        !nextDriver.includes("Unassigned") && selectedOrder.workflow_stage === "NOT_PREPARED"
+                          ? "IN_PROCESS"
+                          : selectedOrder.workflow_stage;
+                      handleUpdateOrderDispatch(selectedOrder, {
+                        assigned_driver: nextDriver,
+                        workflow_stage: nextStage,
+                      });
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "8px 10px",
+                      borderRadius: "6px",
+                      border: "1px solid #86efac",
+                      background: "#fff",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <option value="Unassigned (Pending Dispatch)">Unassigned (Pending Dispatch)</option>
+                    {deliveryDrivers.map((d) => {
+                      const platePart = d.plate_number ? ` [${d.plate_number}]` : "";
+                      const label = `${d.vehicle_type}${platePart} — ${d.name} (${d.phone})`;
+                      return (
+                        <option key={d.id} value={label}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Clean Ordered Items Table */}
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: "10px", overflow: "hidden" }}>
+              <div style={{ background: "#f8fafc", padding: "10px 14px", fontSize: "12px", fontWeight: 700, color: "#475569", borderBottom: "1px solid #e2e8f0" }}>
+                🛒 Ordered Items ({selectedOrder.items.reduce((s, i) => s + i.quantity, 0)} items)
+              </div>
+              <table className="data-table" style={{ margin: 0 }}>
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Qty</th>
+                    <th>Unit Price</th>
+                    <th>Line Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedOrder.items.map((it, idx) => (
+                    <tr key={idx}>
+                      <td className="bold-cell">{it.title}</td>
+                      <td>× {it.quantity}</td>
+                      <td>${it.unit_price.toFixed(2)}</td>
+                      <td className="bold-cell">${(it.unit_price * it.quantity).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ background: "#f8fafc", padding: "12px 16px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "14px" }}>
+                <span>
+                  Subtotal: <strong>${selectedOrder.subtotal_usd.toFixed(2)}</strong> · Delivery: <strong>${selectedOrder.shipping_usd.toFixed(2)}</strong>
+                </span>
+                <span style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a" }}>
+                  Total: ${selectedOrder.total_usd.toFixed(2)}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -287,18 +287,11 @@ export async function POST(request: NextRequest) {
         ? `$${finalDeliveryFee.toFixed(2)} (Category ${areaInfo.category} $${baseDeliveryFee.toFixed(2)} + $${heavyOrderSurcharge.toFixed(2)} Heavy Order Fee)`
         : `$${finalDeliveryFee.toFixed(2)} (Category ${areaInfo.category})`;
 
-    // Shopify "Additional Details" (note_attributes) for QuickSuuq Staff in Shopify Admin Orders
-    const noteAttributes = [
-      { name: "Customer Name", value: customerName },
-      { name: "Phone", value: formattedPhone },
-      { name: "Delivery Area", value: `${deliveryArea} (Category ${areaInfo.category})` },
-      { name: "Delivery Fee", value: feeBreakdownText },
-      { name: "Detailed Address", value: detailedAddress || "Not provided" },
-      { name: "Estimated Order Weight", value: weightSummaryText },
-      { name: "Weight / Volume Check", value: missingWeightStatus },
-      { name: "Recommended Vehicle", value: vehicleLabel },
-      { name: "Payment Status", value: "Paid Online (EVC Plus)" },
-    ];
+    // Keep Additional Details (note_attributes) minimal & clean so Shopify Order page is not cluttered
+    const noteAttributes: Array<{ name: string; value: string }> = [];
+    if (detailedAddress) {
+      noteAttributes.push({ name: "Detailed Address", value: detailedAddress });
+    }
 
     // Shopify Order Tags for instant filtering/visibility on the Orders list
     const orderTagList = [
@@ -369,7 +362,9 @@ export async function POST(request: NextRequest) {
         gateway: "EVC Plus / Zaad / Sahal (Mobile Money)",
         payment_gateway_names: ["EVC Plus / Zaad / Sahal (Mobile Money)"],
         tags: orderTagList.join(", "),
-        note: `Customer: ${customerName} | Area: ${deliveryArea} (Cat ${areaInfo.category}) | Fee: $${finalDeliveryFee.toFixed(2)} | Weight: ${weightSummaryText} | Recommended Vehicle: ${vehicleLabel} | Phone: ${formattedPhone}`,
+        note: detailedAddress
+          ? `Delivery Address: ${deliveryArea} — ${detailedAddress}`
+          : `Delivery Area: ${deliveryArea}`,
         note_attributes: noteAttributes,
         metafields: [
           {
