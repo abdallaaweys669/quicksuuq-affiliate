@@ -118,7 +118,7 @@ export default function AdminDashboardPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<"orders" | "commissions" | "salespeople" | "payouts" | "delivery">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "commissions" | "salespeople" | "payouts" | "delivery">("commissions");
   const [deliverySubTab, setDeliverySubTab] = useState<"areas" | "vehicles" | "drivers">("areas");
 
   // Orders & Dispatch 5-Tab state
@@ -849,12 +849,6 @@ export default function AdminDashboardPage() {
       <section className="content-card">
         <div className="admin-toolbar">
           <div className="tabs-header">
-            <button
-              className={`tab-btn ${activeTab === "orders" ? "active" : ""}`}
-              onClick={() => setActiveTab("orders")}
-            >
-              📦 Orders & Dispatch ({ordersList.length})
-            </button>
             <button
               className={`tab-btn ${activeTab === "commissions" ? "active" : ""}`}
               onClick={() => setActiveTab("commissions")}

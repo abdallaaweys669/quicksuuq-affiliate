@@ -377,7 +377,7 @@ export async function POST(request: NextRequest) {
             namespace: "quicksuuq",
             key: "delivery_status",
             type: "single_line_text_field",
-            value: "Pending Dispatch",
+            value: "2. Paid - Not Prepared",
           },
           {
             namespace: "quicksuuq",
