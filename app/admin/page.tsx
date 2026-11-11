@@ -1032,195 +1032,36 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="polaris-admin-shell">
-      {/* Left Sidebar Navigation (Menus below QuickSuuq Affiliate) */}
-      <aside className="polaris-sidebar">
-        <div className="polaris-sidebar-brand">
-          <Image
-            src="/logo.png"
-            alt="QuickSuuq"
-            width={118}
-            height={28}
-            priority
-            className="brand-logo-img"
-            style={{ height: "24px" }}
-          />
-          <div>
-            <div className="polaris-sidebar-title">QuickSuuq App</div>
-            <div className="polaris-sidebar-sub">Store Management</div>
-          </div>
-        </div>
-
-        <div className="polaris-nav-section-label">Affiliate &amp; Partners</div>
-        <button
-          type="button"
-          className={`polaris-nav-item ${activeTab === "commissions" ? "active" : ""}`}
-          onClick={() => setActiveTab("commissions")}
-        >
-          <span className="polaris-nav-item-left">
-            <span>📊</span>
-            <span>Commissions</span>
-          </span>
-          <span className="polaris-nav-badge">{commissions.length}</span>
-        </button>
-
-        <button
-          type="button"
-          className={`polaris-nav-item ${activeTab === "salespeople" ? "active" : ""}`}
-          onClick={() => setActiveTab("salespeople")}
-        >
-          <span className="polaris-nav-item-left">
-            <span>👥</span>
-            <span>Sales Team</span>
-          </span>
-          <span className="polaris-nav-badge">{salespeople.length}</span>
-        </button>
-
-        <button
-          type="button"
-          className={`polaris-nav-item ${activeTab === "payouts" ? "active" : ""}`}
-          onClick={() => setActiveTab("payouts")}
-        >
-          <span className="polaris-nav-item-left">
-            <span>💸</span>
-            <span>Payouts &amp; EVC</span>
-          </span>
-          <span className="polaris-nav-badge">{payouts.length}</span>
-        </button>
-
-        <div className="polaris-nav-section-label">Operations</div>
-        <button
-          type="button"
-          className={`polaris-nav-item ${activeTab === "orders" ? "active" : ""}`}
-          onClick={() => setActiveTab("orders")}
-        >
-          <span className="polaris-nav-item-left">
-            <span>📦</span>
-            <span>Orders &amp; Dispatch</span>
-          </span>
-          <span className="polaris-nav-badge">{ordersList.length}</span>
-        </button>
-
-        <button
-          type="button"
-          className={`polaris-nav-item ${activeTab === "delivery" ? "active" : ""}`}
-          onClick={() => setActiveTab("delivery")}
-        >
-          <span className="polaris-nav-item-left">
-            <span>🚚</span>
-            <span>Delivery &amp; Logistics</span>
-          </span>
-          <span className="polaris-nav-badge">{deliveryAreas.length}</span>
-        </button>
-        {activeTab === "delivery" && (
-          <div className="polaris-nav-subitems">
-            <button
-              type="button"
-              className={`polaris-nav-subitem ${deliverySubTab === "areas" ? "active" : ""}`}
-              onClick={() => setDeliverySubTab("areas")}
-            >
-              <span>Delivery Areas</span>
-              <span>{deliveryAreas.length}</span>
-            </button>
-            <button
-              type="button"
-              className={`polaris-nav-subitem ${deliverySubTab === "vehicles" ? "active" : ""}`}
-              onClick={() => setDeliverySubTab("vehicles")}
-            >
-              <span>Vehicles &amp; Weights</span>
-              <span>{deliveryVehicles.length}</span>
-            </button>
-            <button
-              type="button"
-              className={`polaris-nav-subitem ${deliverySubTab === "drivers" ? "active" : ""}`}
-              onClick={() => setDeliverySubTab("drivers")}
-            >
-              <span>Drivers Registry</span>
-              <span>{deliveryDrivers.length}</span>
-            </button>
-          </div>
-        )}
-
-        <div className="polaris-nav-section-label">Online Store</div>
-        <button
-          type="button"
-          className={`polaris-nav-item ${activeTab === "storefront" ? "active" : ""}`}
-          onClick={() => setActiveTab("storefront")}
-        >
-          <span className="polaris-nav-item-left">
-            <span>🎨</span>
-            <span>Website Content</span>
-          </span>
-          <span className="polaris-nav-badge">CMS</span>
-        </button>
-        {activeTab === "storefront" && (
-          <div className="polaris-nav-subitems">
-            <button
-              type="button"
-              className={`polaris-nav-subitem ${storefrontSubTab === "hero" ? "active" : ""}`}
-              onClick={() => setStorefrontSubTab("hero")}
-            >
-              <span>Hero Carousel Slider</span>
-              <span>{activeSlidesCount}/{heroSlider.slides.length}</span>
-            </button>
-            <button
-              type="button"
-              className={`polaris-nav-subitem ${storefrontSubTab === "categories" ? "active" : ""}`}
-              onClick={() => setStorefrontSubTab("categories")}
-            >
-              <span>Featured Categories</span>
-              <span>{activeCategoriesCount}</span>
-            </button>
-            <button
-              type="button"
-              className={`polaris-nav-subitem ${storefrontSubTab === "promos" ? "active" : ""}`}
-              onClick={() => setStorefrontSubTab("promos")}
-            >
-              <span>Promo Banners</span>
-              <span>{activeBannersCount}/{promoBanners.banners.length}</span>
-            </button>
-            <button
-              type="button"
-              className={`polaris-nav-subitem ${storefrontSubTab === "products" ? "active" : ""}`}
-              onClick={() => setStorefrontSubTab("products")}
-            >
-              <span>Popular Products</span>
-            </button>
-          </div>
-        )}
-
-        <div style={{ marginTop: "auto", paddingTop: "14px", borderTop: "1px solid #dcdcdc" }}>
-          <a
-            href="https://quicksuuq-test.myshopify.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="polaris-nav-item"
-            style={{ textDecoration: "none", fontSize: "12px", color: "#167a62", fontWeight: 600 }}
-          >
-            <span>🌐 View Live Store</span>
-            <span>↗</span>
-          </a>
-        </div>
-      </aside>
-
       {/* Main Polaris Content Area */}
       <main className="polaris-main admin-view">
         {feedbackMsg && <div className="toast-notification">{feedbackMsg}</div>}
 
         <header className="dashboard-topbar">
           <div className="brand-group">
+            <Link href="/" className="brand-logo-wrap" style={{ marginRight: "12px" }}>
+              <Image
+                src="/logo.png"
+                alt="QuickSuuq"
+                width={120}
+                height={28}
+                priority
+                className="brand-logo-img"
+                style={{ height: "24px" }}
+              />
+            </Link>
             <div className="rep-header-info">
               <h2 className="rep-name">
-                {isAffiliateSection && "Affiliate & Commission Management"}
-                {activeTab === "delivery" && "Delivery & Logistics Management"}
-                {activeTab === "orders" && "Orders & Dispatch Board"}
-                {activeTab === "storefront" && "Website Content & Homepage CMS"}
+                {activeTab === "orders" && "Orders & Dispatch"}
+                {isAffiliateSection && "Affiliate & Partner Network"}
+                {activeTab === "delivery" && "Delivery & Logistics"}
+                {activeTab === "storefront" && "Website Content (CMS)"}
               </h2>
               <div className="rep-meta">
                 <span>
-                  {isAffiliateSection && "Manage affiliate commissions, sales team referrals, and EVC Plus payouts"}
-                  {activeTab === "delivery" && "Manage Mogadishu delivery districts, fees, vehicle weight tiers, and drivers"}
-                  {activeTab === "orders" && "Track and dispatch customer orders across Mogadishu"}
-                  {activeTab === "storefront" && "Add, edit, show, or hide Hero Slider slides, Featured Categories, and Promo Banners"}
+                  {activeTab === "orders" && "Track, prepare, and assign Mogadishu deliveries directly to drivers"}
+                  {isAffiliateSection && "Sales team commissions, customer tracking, and EVC Plus batch payouts"}
+                  {activeTab === "delivery" && "Mogadishu delivery zones, vehicle weight capacities, and driver registry"}
+                  {activeTab === "storefront" && "Hero Slider, Featured Categories, Promo Banners, and Popular Products"}
                 </span>
               </div>
             </div>
@@ -1236,6 +1077,15 @@ export default function AdminDashboardPage() {
                 {savingStorefront ? "Publishing..." : "✓ Save & Publish to Store"}
               </button>
             )}
+            <a
+              href="https://quicksuuq-test.myshopify.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-action secondary"
+              style={{ textDecoration: "none" }}
+            >
+              View Store ↗
+            </a>
             <span className="rate-badge live">● Live Sync</span>
             <button onClick={handleLogout} className="btn-logout">
               Exit
