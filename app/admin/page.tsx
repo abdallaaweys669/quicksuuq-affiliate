@@ -561,6 +561,35 @@ export default function AdminDashboardPage() {
     return digits;
   }
 
+  function resolveAutoVehicleByWeight(weightStr: string): string {
+    const match = (weightStr || "").match(/([\d.]+)\s*kg/i);
+    const kg = match ? parseFloat(match[1]) : 0;
+    if (kg > 0 && kg < 20) {
+      return "Motorbike";
+    } else if (kg >= 20 && kg <= 300) {
+      return "Bajaj";
+    } else if (kg > 300) {
+      return "Mini-Truck";
+    }
+    return "Bajaj";
+  }
+
+  function cleanCustomerDestination(area: string, address: string): { cleanArea: string; cleanAddress: string } {
+    let cleanArea = (area || "").split("—")[0].split("(")[0].trim();
+    let cleanAddress = (address || "").trim();
+
+    // Strip out internal checkout notes, sales rep codes, and raw payment traces
+    cleanAddress = cleanAddress.replace(/EVC Plus Online Payment[^\n.]*/gi, "");
+    cleanAddress = cleanAddress.replace(/Rep:\s*[A-Za-z0-9_-]+/gi, "");
+    cleanAddress = cleanAddress.replace(/Referral:\s*[A-Za-z0-9_-]+/gi, "");
+    cleanAddress = cleanAddress.replace(/100% Paid[^\n.]*/gi, "");
+    cleanAddress = cleanAddress.replace(/Paid via[^\n.]*/gi, "");
+    cleanAddress = cleanAddress.replace(/\(\s*\)/g, "");
+    cleanAddress = cleanAddress.replace(/^[,\s.-]+|[,\s.-]+$/g, "").trim();
+
+    return { cleanArea, cleanAddress };
+  }
+
   function getDispatchWhatsAppText(
     order: DispatchOrder,
     driverName: string,
@@ -568,23 +597,25 @@ export default function AdminDashboardPage() {
     vehicle: string
   ): string {
     const driverDisplay = driverName.trim() || "Darawalka QuickSuuq";
-    const phoneDisplay = driverPhone.trim() || "Wuu kula soo xiriirayaa";
-    const areaDisplay = order.delivery_area.split("—")[0].trim();
-    const addressDisplay = order.detailed_address ? ` (${order.detailed_address})` : "";
+    const phoneDisplay = driverPhone.trim() || "Wuu kula soo xiriiri doonaa";
+    const { cleanArea, cleanAddress } = cleanCustomerDestination(order.delivery_area, order.detailed_address);
+    const locationDisplay = cleanAddress ? `${cleanArea} (${cleanAddress})` : cleanArea || "Mogadishu";
 
     return `Asc ${order.customer_name || "Macaamiil"}! Dalabkaaga QuickSuuq (${order.order_number}) waa la diyaariyay oo hadda wadada ayuu ku jiraa 🚀.
 
 Darawalka kuu wada: ${driverDisplay}
-Taleefanka: ${phoneDisplay}
+Taleefanka Darawalka: ${phoneDisplay}
 Gaariga: ${vehicle || "Bajaj"}
-Goobta: ${areaDisplay}${addressDisplay}
+Goobta: ${locationDisplay}
 
-Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaada soo dhowaado. Mahadsanid!`;
+Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro marka uu goobtaada soo dhowaado. Mahadsanid!`;
   }
 
   function openManageOrder(o: DispatchOrder) {
     setSelectedOrder(o);
     setCopiedSms(false);
+    const suggestedVehicle = resolveAutoVehicleByWeight(o.order_weight);
+
     if (o.assigned_driver && !o.assigned_driver.includes("Unassigned")) {
       const parts = o.assigned_driver.split("—");
       if (parts.length > 1) {
@@ -598,24 +629,22 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
           setIjarDriverName(rest);
           setIjarDriverPhone("");
         }
-        if (v.toLowerCase().includes("mooto")) setIjarVehicle("Mooto");
-        else if (v.toLowerCase().includes("gaari") || v.toLowerCase().includes("homey")) setIjarVehicle("Gaari");
-        else setIjarVehicle("Bajaj");
+        if (v.toLowerCase().includes("mooto") || v.toLowerCase().includes("motor") || v.toLowerCase().includes("fekon")) {
+          setIjarVehicle("Motorbike");
+        } else if (v.toLowerCase().includes("gaari") || v.toLowerCase().includes("truck") || v.toLowerCase().includes("homey")) {
+          setIjarVehicle("Mini-Truck");
+        } else {
+          setIjarVehicle("Bajaj");
+        }
       } else {
         setIjarDriverName(o.assigned_driver);
         setIjarDriverPhone("");
-        setIjarVehicle("Bajaj");
+        setIjarVehicle(suggestedVehicle);
       }
     } else {
       setIjarDriverName("");
       setIjarDriverPhone("");
-      setIjarVehicle(
-        o.recommended_vehicle.includes("Mooto")
-          ? "Mooto"
-          : o.recommended_vehicle.includes("Gaari")
-          ? "Gaari"
-          : "Bajaj"
-      );
+      setIjarVehicle(suggestedVehicle);
     }
   }
 
@@ -636,7 +665,7 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
       assigned_driver: driverLabel,
       workflow_stage: nextStage,
     });
-    showFeedback("✓ Darawalka ijaarka ah waa la xaqiijiyay & Shopify waa la cusboonaysiiyay!");
+    showFeedback("✓ Driver details saved and synced with Shopify!");
   }
 
   async function handleSaveHeavySettings(e: React.FormEvent) {
@@ -1589,7 +1618,7 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                     <th>Customer &amp; Phone</th>
                     <th>Delivery Area</th>
                     <th>Weight &amp; Vehicle</th>
-                    <th>Darawal Ijaar</th>
+                    <th>Hired Driver</th>
                     <th>Total</th>
                     <th>Stage</th>
                     <th>Action</th>
@@ -1694,12 +1723,13 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                                   fontSize: "12px",
                                   color: "#94a3b8",
                                   background: "#f1f5f9",
+                                  whiteSpace: "nowrap",
                                 }}
                               >
-                                Aan la dhiibin
+                                Unassigned
                               </span>
                             ) : (
-                              <div style={{ fontSize: "12px", fontWeight: 600, color: "#0f172a" }}>
+                              <div style={{ fontSize: "12px", fontWeight: 600, color: "#0f172a", whiteSpace: "nowrap" }}>
                                 🛺 {o.assigned_driver}
                               </div>
                             )}
@@ -1715,6 +1745,7 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                                 fontWeight: 700,
                                 background: b.bg,
                                 color: b.color,
+                                whiteSpace: "nowrap",
                               }}
                             >
                               {b.label}
@@ -1724,8 +1755,21 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                             <button
                               type="button"
                               onClick={() => openManageOrder(o)}
-                              className="btn-action secondary"
-                              style={{ padding: "5px 12px", fontSize: "12px", height: "auto" }}
+                              style={{
+                                background: "#18181b",
+                                color: "#ffffff",
+                                border: "1px solid #18181b",
+                                padding: "6px 14px",
+                                borderRadius: "6px",
+                                fontSize: "12px",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                whiteSpace: "nowrap",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                              }}
                             >
                               Manage ➜
                             </button>
@@ -3837,17 +3881,17 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
             {/* 5-Stage Progress Switcher (1-Click) */}
             <div style={{ marginBottom: "18px" }}>
               <div style={{ fontSize: "12px", fontWeight: 700, color: "#475569", marginBottom: "8px", textTransform: "uppercase" }}>
-                1-Click Order Status (Marxaladda Dalabka)
+                1-Click Order Stage
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(125px, 1fr))", gap: "8px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "8px" }}>
                 {(
                   [
-                    { key: "UNPAID", label: "1. Unpaid", sub: "Lacag La'aan" },
-                    { key: "NOT_PREPARED", label: "2. Not Prepared", sub: "Aan La Diyaarin" },
-                    { key: "IN_PROCESS", label: "3. In Process", sub: "Diyaarin" },
-                    { key: "OUT_FOR_DELIVERY", label: "4. Out for Delivery", sub: "Wadada" },
-                    { key: "DELIVERED", label: "5. Delivered", sub: "La Gaarsiiyay" },
-                  ] as Array<{ key: OrderWorkflowStage; label: string; sub: string }>
+                    { key: "UNPAID", label: "1. Unpaid", desc: "Awaiting payment" },
+                    { key: "NOT_PREPARED", label: "2. Not Prepared", desc: "Ready to pack" },
+                    { key: "IN_PROCESS", label: "3. In Process", desc: "Packing / Assigning" },
+                    { key: "OUT_FOR_DELIVERY", label: "4. Out for Delivery", desc: "On the way" },
+                    { key: "DELIVERED", label: "5. Delivered", desc: "Order completed" },
+                  ] as Array<{ key: OrderWorkflowStage; label: string; desc: string }>
                 ).map((st) => {
                   const active = selectedOrder.workflow_stage === st.key;
                   return (
@@ -3857,24 +3901,25 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                       disabled={savingOrderDispatch}
                       onClick={() => handleUpdateOrderDispatch(selectedOrder, { workflow_stage: st.key })}
                       style={{
-                        padding: "9px 10px",
+                        padding: "9px 12px",
                         borderRadius: "8px",
                         border: active ? "2px solid #0d9488" : "1px solid #cbd5e1",
                         background: active ? "#f0fdfa" : "#fff",
                         color: active ? "#0f766e" : "#334155",
                         cursor: "pointer",
                         textAlign: "left",
+                        transition: "all 0.15s ease",
                       }}
                     >
-                      <div style={{ fontSize: "12px", fontWeight: 700 }}>{st.label}</div>
-                      <div style={{ fontSize: "11px", color: "#64748b" }}>{st.sub}</div>
+                      <div style={{ fontSize: "12px", fontWeight: 700, whiteSpace: "nowrap" }}>{st.label}</div>
+                      <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px", whiteSpace: "nowrap" }}>{st.desc}</div>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* 2 Clean Side-by-Side Cards: Customer/Address + Ijaar Driver & Customer Notification */}
+            {/* 2 Clean Side-by-Side Cards: Customer/Address + Hired Driver & Customer Notification */}
             <div
               style={{
                 display: "grid",
@@ -3953,6 +3998,7 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                           fontSize: "12px",
                           fontWeight: 700,
                           cursor: "pointer",
+                          whiteSpace: "nowrap",
                         }}
                       >
                         📲 WhatsApp Customer
@@ -3972,6 +4018,7 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                         fontSize: "12px",
                         fontWeight: 600,
                         textDecoration: "none",
+                        whiteSpace: "nowrap",
                       }}
                     >
                       📞 Call Customer
@@ -3979,15 +4026,15 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                   </div>
 
                   <div style={{ fontSize: "13px", color: "#334155", marginBottom: "6px", borderTop: "1px solid #e2e8f0", paddingTop: "10px" }}>
-                    <strong>Delivery Area:</strong> {selectedOrder.delivery_area}
+                    <strong>Delivery Area:</strong> {cleanCustomerDestination(selectedOrder.delivery_area, selectedOrder.detailed_address).cleanArea || selectedOrder.delivery_area.split("—")[0].trim()}
                   </div>
                   <div style={{ fontSize: "13px", color: "#334155" }}>
-                    <strong>Detailed Address:</strong> {selectedOrder.detailed_address || "Mogadishu"}
+                    <strong>Detailed Address:</strong> {cleanCustomerDestination(selectedOrder.delivery_area, selectedOrder.detailed_address).cleanAddress || "Mogadishu"}
                   </div>
                 </div>
               </div>
 
-              {/* Card 2: Darawal Ijaar (Freelance / Hired Driver Dispatch) */}
+              {/* Card 2: Hired Driver (On-Demand Dispatch) */}
               <div
                 style={{
                   background: "#f0fdf4",
@@ -4008,9 +4055,9 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                     alignItems: "center",
                   }}
                 >
-                  <span>🚚 Darawal Ijaar (Hired Delivery Driver)</span>
+                  <span>🚚 Hired Driver (On-Demand Dispatch)</span>
                   <span style={{ fontSize: "11px", fontWeight: 600, color: "#166534", background: "#dcfce7", padding: "2px 8px", borderRadius: "999px" }}>
-                    On-Demand Dispatch
+                    Live Dispatch
                   </span>
                 </div>
 
@@ -4028,19 +4075,19 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                     color: "#166534",
                   }}
                 >
-                  <span>⚖️ Miisaanka: <strong>{selectedOrder.order_weight.split("(")[0].trim()}</strong></span>
-                  <span>🚗 Gaariga: <strong>{selectedOrder.recommended_vehicle.split("(")[0].trim()}</strong></span>
+                  <span>⚖️ Cart Weight: <strong>{selectedOrder.order_weight.split("(")[0].trim()}</strong></span>
+                  <span>🚗 Suggested: <strong>{resolveAutoVehicleByWeight(selectedOrder.order_weight)}</strong></span>
                 </div>
 
-                {/* Ijaar Driver Form */}
+                {/* Driver Form */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "10px" }}>
                   <div>
                     <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>
-                      Magaca Darawalka Ijaarka:
+                      Driver Name:
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Cabdi Cali"
+                      placeholder="e.g. Abdi Ali"
                       value={ijarDriverName}
                       onChange={(e) => setIjarDriverName(e.target.value)}
                       style={{
@@ -4055,7 +4102,7 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                   </div>
                   <div>
                     <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>
-                      Taleefanka Darawalka:
+                      Driver Phone:
                     </label>
                     <input
                       type="text"
@@ -4078,17 +4125,17 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                 <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "12px" }}>
                   <div style={{ flex: "1 1 auto" }}>
                     <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>
-                      Nooca Gaariga:
+                      Vehicle Type:
                     </label>
                     <div style={{ display: "flex", gap: "6px" }}>
-                      {(["Bajaj", "Mooto", "Gaari"] as const).map((v) => (
+                      {(["Bajaj", "Motorbike", "Mini-Truck"] as const).map((v) => (
                         <button
                           key={v}
                           type="button"
                           onClick={() => setIjarVehicle(v)}
                           style={{
                             flex: 1,
-                            padding: "5px 6px",
+                            padding: "6px 8px",
                             fontSize: "12px",
                             fontWeight: 700,
                             borderRadius: "6px",
@@ -4096,16 +4143,17 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                             background: ijarVehicle === v ? "#dcfce7" : "#ffffff",
                             color: ijarVehicle === v ? "#15803d" : "#475569",
                             cursor: "pointer",
+                            whiteSpace: "nowrap",
                           }}
                         >
-                          {v === "Bajaj" ? "🛺 Bajaj" : v === "Mooto" ? "🛵 Mooto" : "🚐 Gaari"}
+                          {v === "Bajaj" ? "🛺 Bajaj" : v === "Motorbike" ? "🛵 Motorbike" : "🚐 Mini-Truck"}
                         </button>
                       ))}
                     </div>
                   </div>
                   <div style={{ width: "95px" }}>
                     <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>
-                      Kirada ($):
+                      Fare ($):
                     </label>
                     <input
                       type="number"
@@ -4140,6 +4188,7 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {savingOrderDispatch ? "Saving..." : "💾 Save Driver & Sync Shopify"}
@@ -4165,9 +4214,10 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    📲 U Dir Macaamiilka WhatsApp
+                    📲 Send WhatsApp to Customer
                   </button>
                   <button
                     type="button"
@@ -4175,7 +4225,7 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                       const text = getDispatchWhatsAppText(selectedOrder, ijarDriverName, ijarDriverPhone, ijarVehicle);
                       navigator.clipboard.writeText(text);
                       setCopiedSms(true);
-                      showFeedback("✓ Farriinta macaamiilka waa la nuulbiyay (Copied to clipboard)!");
+                      showFeedback("✓ Message copied to clipboard!");
                       setTimeout(() => setCopiedSms(false), 3000);
                     }}
                     style={{
@@ -4188,9 +4238,10 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                       fontSize: "12px",
                       fontWeight: 600,
                       cursor: "pointer",
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    {copiedSms ? "✓ Nuulbiyay!" : "📋 Nuulbee Farriinta (Copy SMS)"}
+                    {copiedSms ? "✓ Copied!" : "📋 Copy Message (SMS)"}
                   </button>
                 </div>
               </div>
