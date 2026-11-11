@@ -245,6 +245,11 @@ export default function AdminDashboardPage() {
   const [orderSearch, setOrderSearch] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<DispatchOrder | null>(null);
   const [savingOrderDispatch, setSavingOrderDispatch] = useState(false);
+  const [ijarDriverName, setIjarDriverName] = useState("");
+  const [ijarDriverPhone, setIjarDriverPhone] = useState("");
+  const [ijarVehicle, setIjarVehicle] = useState("Bajaj");
+  const [ijarFareUsd, setIjarFareUsd] = useState("1.50");
+  const [copiedSms, setCopiedSms] = useState(false);
 
   // Data states
   const [commissions, setCommissions] = useState<Commission[]>([]);
@@ -545,6 +550,93 @@ export default function AdminDashboardPage() {
     } finally {
       setSavingOrderDispatch(false);
     }
+  }
+
+  function formatSomaliWhatsAppNumber(phone: string): string {
+    if (!phone) return "";
+    let digits = phone.replace(/[^0-9]/g, "");
+    if (digits.startsWith("00252")) digits = digits.slice(2);
+    if (digits.startsWith("0")) digits = "252" + digits.slice(1);
+    if (!digits.startsWith("252") && digits.length >= 7) digits = "252" + digits;
+    return digits;
+  }
+
+  function getDispatchWhatsAppText(
+    order: DispatchOrder,
+    driverName: string,
+    driverPhone: string,
+    vehicle: string
+  ): string {
+    const driverDisplay = driverName.trim() || "Darawalka QuickSuuq";
+    const phoneDisplay = driverPhone.trim() || "Wuu kula soo xiriirayaa";
+    const areaDisplay = order.delivery_area.split("—")[0].trim();
+    const addressDisplay = order.detailed_address ? ` (${order.detailed_address})` : "";
+
+    return `Asc ${order.customer_name || "Macaamiil"}! Dalabkaaga QuickSuuq (${order.order_number}) waa la diyaariyay oo hadda wadada ayuu ku jiraa 🚀.
+
+Darawalka kuu wada: ${driverDisplay}
+Taleefanka: ${phoneDisplay}
+Gaariga: ${vehicle || "Bajaj"}
+Goobta: ${areaDisplay}${addressDisplay}
+
+Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaada soo dhowaado. Mahadsanid!`;
+  }
+
+  function openManageOrder(o: DispatchOrder) {
+    setSelectedOrder(o);
+    setCopiedSms(false);
+    if (o.assigned_driver && !o.assigned_driver.includes("Unassigned")) {
+      const parts = o.assigned_driver.split("—");
+      if (parts.length > 1) {
+        const v = parts[0].trim();
+        const rest = parts[1].trim();
+        const match = rest.match(/^(.*?)\s*\((.*?)\)$/);
+        if (match) {
+          setIjarDriverName(match[1].trim());
+          setIjarDriverPhone(match[2].trim());
+        } else {
+          setIjarDriverName(rest);
+          setIjarDriverPhone("");
+        }
+        if (v.toLowerCase().includes("mooto")) setIjarVehicle("Mooto");
+        else if (v.toLowerCase().includes("gaari") || v.toLowerCase().includes("homey")) setIjarVehicle("Gaari");
+        else setIjarVehicle("Bajaj");
+      } else {
+        setIjarDriverName(o.assigned_driver);
+        setIjarDriverPhone("");
+        setIjarVehicle("Bajaj");
+      }
+    } else {
+      setIjarDriverName("");
+      setIjarDriverPhone("");
+      setIjarVehicle(
+        o.recommended_vehicle.includes("Mooto")
+          ? "Mooto"
+          : o.recommended_vehicle.includes("Gaari")
+          ? "Gaari"
+          : "Bajaj"
+      );
+    }
+  }
+
+  async function handleSaveIjarDriver(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    if (!selectedOrder) return;
+    const driverLabel = ijarDriverName.trim()
+      ? `${ijarVehicle} — ${ijarDriverName.trim()}${ijarDriverPhone.trim() ? ` (${ijarDriverPhone.trim()})` : ""}`
+      : "Unassigned (Pending Dispatch)";
+
+    const nextStage =
+      driverLabel !== "Unassigned (Pending Dispatch)" &&
+      (selectedOrder.workflow_stage === "NOT_PREPARED" || selectedOrder.workflow_stage === "UNPAID")
+        ? "IN_PROCESS"
+        : selectedOrder.workflow_stage;
+
+    await handleUpdateOrderDispatch(selectedOrder, {
+      assigned_driver: driverLabel,
+      workflow_stage: nextStage,
+    });
+    showFeedback("✓ Darawalka ijaarka ah waa la xaqiijiyay & Shopify waa la cusboonaysiiyay!");
   }
 
   async function handleSaveHeavySettings(e: React.FormEvent) {
@@ -1310,66 +1402,65 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-        {/* Tab 0: Orders & Dispatch (5-Tab Workflow Board) */}
+        {/* Tab 0: Orders & Dispatch (Shopify Polaris-Native Workflow Board) */}
         {activeTab === "orders" && (
-          <div style={{ padding: "20px 24px" }}>
-            {/* Top 5 Workflow Stage Filter Cards */}
+          <div style={{ padding: "18px 24px" }}>
+            {/* Polaris Segmented Stage Filter Bar */}
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))",
-                gap: "10px",
-                marginBottom: "18px",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                overflowX: "auto",
+                padding: "6px",
+                background: "#f1f5f9",
+                borderRadius: "10px",
+                marginBottom: "16px",
               }}
             >
               {[
                 {
                   key: "ALL" as const,
                   label: "All Orders",
-                  sub: "Dhammaan Dalabyada",
+                  count: ordersList.length,
                   color: "#0f172a",
-                  bg: "#f8fafc",
                 },
                 {
                   key: "UNPAID" as const,
                   label: "1. Unpaid",
-                  sub: "Lacag La'aan",
+                  count: ordersList.filter((o) => o.workflow_stage === "UNPAID").length,
                   color: "#b45309",
-                  bg: "#fffbeb",
+                  bg: "#fef3c7",
                 },
                 {
                   key: "NOT_PREPARED" as const,
                   label: "2. Paid (Not Prepared)",
-                  sub: "Aan Weli La Diyaarin",
+                  count: ordersList.filter((o) => o.workflow_stage === "NOT_PREPARED").length,
                   color: "#1d4ed8",
-                  bg: "#eff6ff",
+                  bg: "#dbeafe",
                 },
                 {
                   key: "IN_PROCESS" as const,
                   label: "3. In Process",
-                  sub: "Diyaarin / Laguuda Jiraa",
+                  count: ordersList.filter((o) => o.workflow_stage === "IN_PROCESS").length,
                   color: "#7c3aed",
-                  bg: "#f5f3ff",
+                  bg: "#ede9fe",
                 },
                 {
                   key: "OUT_FOR_DELIVERY" as const,
                   label: "4. Out for Delivery",
-                  sub: "Wadada Ku Jira",
-                  color: "#0369a1",
-                  bg: "#f0f9ff",
+                  count: ordersList.filter((o) => o.workflow_stage === "OUT_FOR_DELIVERY").length,
+                  color: "#0284c7",
+                  bg: "#e0f2fe",
                 },
                 {
                   key: "DELIVERED" as const,
                   label: "5. Delivered",
-                  sub: "La Gaarsiiyay",
+                  count: ordersList.filter((o) => o.workflow_stage === "DELIVERED").length,
                   color: "#15803d",
-                  bg: "#f0fdf4",
+                  bg: "#dcfce7",
                 },
               ].map((st) => {
-                const count =
-                  st.key === "ALL"
-                    ? ordersList.length
-                    : ordersList.filter((o) => o.workflow_stage === st.key).length;
                 const isSelected = orderStageTab === st.key;
                 return (
                   <button
@@ -1377,32 +1468,35 @@ export default function AdminDashboardPage() {
                     type="button"
                     onClick={() => setOrderStageTab(st.key)}
                     style={{
-                      textAlign: "left",
-                      padding: "12px 14px",
-                      borderRadius: "10px",
-                      border: isSelected ? `2px solid ${st.color}` : "1px solid #e2e8f0",
-                      background: isSelected ? st.bg : "#ffffff",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "8px 14px",
+                      borderRadius: "8px",
+                      border: isSelected ? "1px solid #cbd5e1" : "1px solid transparent",
+                      background: isSelected ? "#ffffff" : "transparent",
+                      boxShadow: isSelected ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                      fontWeight: isSelected ? 700 : 500,
+                      fontSize: "13px",
+                      color: isSelected ? "#0f172a" : "#475569",
                       cursor: "pointer",
+                      whiteSpace: "nowrap",
                       transition: "all 0.15s ease",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "12px", fontWeight: 700, color: st.color }}>{st.label}</span>
-                      <span
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 800,
-                          color: st.color,
-                          background: "#fff",
-                          padding: "2px 8px",
-                          borderRadius: "999px",
-                          border: "1px solid #e2e8f0",
-                        }}
-                      >
-                        {count}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>{st.sub}</div>
+                    <span>{st.label}</span>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        padding: "2px 7px",
+                        borderRadius: "999px",
+                        background: isSelected ? (st.bg || "#f1f5f9") : "#e2e8f0",
+                        color: isSelected ? (st.color || "#0f172a") : "#64748b",
+                      }}
+                    >
+                      {st.count}
+                    </span>
                   </button>
                 );
               })}
@@ -1418,33 +1512,72 @@ export default function AdminDashboardPage() {
                 justifyContent: "space-between",
                 marginBottom: "16px",
                 background: "#f8fafc",
-                padding: "12px 14px",
+                padding: "10px 14px",
                 borderRadius: "8px",
                 border: "1px solid #e2e8f0",
               }}
             >
-              <input
-                type="text"
-                placeholder="🔍 Search order (#1048), customer name, phone, or area..."
-                value={orderSearch}
-                onChange={(e) => setOrderSearch(e.target.value)}
-                style={{
-                  flex: "1 1 280px",
-                  maxWidth: "460px",
-                  padding: "8px 12px",
-                  borderRadius: "6px",
-                  border: "1px solid #cbd5e1",
-                  fontSize: "13px",
-                }}
-              />
-              <button
-                type="button"
-                onClick={loadAllData}
-                className="btn-action secondary"
-                style={{ height: "36px" }}
-              >
-                ↻ Refresh Orders
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: "1 1 300px" }}>
+                <input
+                  type="text"
+                  placeholder="🔍 Search order (#1048), customer name, phone, or area..."
+                  value={orderSearch}
+                  onChange={(e) => setOrderSearch(e.target.value)}
+                  style={{
+                    flex: "1 1 280px",
+                    maxWidth: "460px",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "13px",
+                    background: "#ffffff",
+                  }}
+                />
+                {orderSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setOrderSearch("")}
+                    style={{
+                      border: "none",
+                      background: "none",
+                      color: "#64748b",
+                      fontSize: "13px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    ✕ Clear
+                  </button>
+                )}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ fontSize: "12px", color: "#64748b" }}>
+                  Showing{" "}
+                  <strong>
+                    {
+                      ordersList.filter((o) => {
+                        const matchTab = orderStageTab === "ALL" || o.workflow_stage === orderStageTab;
+                        const q = orderSearch.trim().toLowerCase();
+                        const matchSearch =
+                          !q ||
+                          o.order_number.toLowerCase().includes(q) ||
+                          o.customer_name.toLowerCase().includes(q) ||
+                          o.phone.toLowerCase().includes(q) ||
+                          o.delivery_area.toLowerCase().includes(q);
+                        return matchTab && matchSearch;
+                      }).length
+                    }
+                  </strong>{" "}
+                  orders
+                </span>
+                <button
+                  type="button"
+                  onClick={loadAllData}
+                  className="btn-action secondary"
+                  style={{ height: "34px", padding: "0 14px", fontSize: "13px" }}
+                >
+                  ↻ Refresh
+                </button>
+              </div>
             </div>
 
             {/* Clean Orders Table */}
@@ -1456,7 +1589,7 @@ export default function AdminDashboardPage() {
                     <th>Customer &amp; Phone</th>
                     <th>Delivery Area</th>
                     <th>Weight &amp; Vehicle</th>
-                    <th>Assigned Driver</th>
+                    <th>Darawal Ijaar</th>
                     <th>Total</th>
                     <th>Stage</th>
                     <th>Action</th>
@@ -1487,19 +1620,60 @@ export default function AdminDashboardPage() {
                         DELIVERED: { label: "5. Delivered", bg: "#dcfce7", color: "#15803d" },
                       };
                       const b = stageBadges[o.workflow_stage];
+                      const isUnassigned = !o.assigned_driver || o.assigned_driver.includes("Unassigned");
+                      const cleanPhone = formatSomaliWhatsAppNumber(o.phone);
+
                       return (
                         <tr key={o.gid}>
-                          <td className="bold-cell">{o.order_number}</td>
-                          <td>
-                            <div style={{ fontWeight: 600, color: "#0f172a" }}>{o.customer_name}</div>
-                            <div style={{ fontSize: "12px", color: "#64748b" }}>{o.phone}</div>
+                          <td className="bold-cell">
+                            <span
+                              onClick={() => openManageOrder(o)}
+                              style={{ color: "#0f766e", cursor: "pointer", textDecoration: "underline" }}
+                            >
+                              {o.order_number}
+                            </span>
                           </td>
                           <td>
-                            <div style={{ fontWeight: 500, color: "#0f172a" }}>
+                            <div style={{ fontWeight: 600, color: "#0f172a" }}>{o.customer_name}</div>
+                            <div style={{ fontSize: "12px", color: "#64748b", display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
+                              <span>{o.phone}</span>
+                              {cleanPhone && (
+                                <a
+                                  href={`https://wa.me/${cleanPhone}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="Chat on WhatsApp"
+                                  style={{
+                                    fontSize: "11px",
+                                    color: "#16a34a",
+                                    fontWeight: 700,
+                                    textDecoration: "none",
+                                    background: "#f0fdf4",
+                                    padding: "1px 5px",
+                                    borderRadius: "4px",
+                                    border: "1px solid #bbf7d0",
+                                  }}
+                                >
+                                  WA ↗
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 600, color: "#0f172a" }}>
                               {o.delivery_area.split("—")[0].trim()}
                             </div>
-                            <div style={{ fontSize: "12px", color: "#64748b", maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {o.detailed_address}
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                color: "#64748b",
+                                maxWidth: "180px",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {o.detailed_address || "Mogadishu"}
                             </div>
                           </td>
                           <td>
@@ -1510,8 +1684,25 @@ export default function AdminDashboardPage() {
                               {o.recommended_vehicle.split("(")[0].trim()}
                             </div>
                           </td>
-                          <td style={{ fontSize: "13px", color: o.assigned_driver.includes("Unassigned") ? "#94a3b8" : "#0f172a", fontWeight: 500 }}>
-                            {o.assigned_driver.includes("Unassigned") ? "Unassigned" : o.assigned_driver}
+                          <td>
+                            {isUnassigned ? (
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  padding: "3px 8px",
+                                  borderRadius: "6px",
+                                  fontSize: "12px",
+                                  color: "#94a3b8",
+                                  background: "#f1f5f9",
+                                }}
+                              >
+                                Aan la dhiibin
+                              </span>
+                            ) : (
+                              <div style={{ fontSize: "12px", fontWeight: 600, color: "#0f172a" }}>
+                                🛺 {o.assigned_driver}
+                              </div>
+                            )}
                           </td>
                           <td className="bold-cell">${o.total_usd.toFixed(2)}</td>
                           <td>
@@ -1532,10 +1723,11 @@ export default function AdminDashboardPage() {
                           <td>
                             <button
                               type="button"
-                              onClick={() => setSelectedOrder(o)}
-                              className="btn-tiny approve"
+                              onClick={() => openManageOrder(o)}
+                              className="btn-action secondary"
+                              style={{ padding: "5px 12px", fontSize: "12px", height: "auto" }}
                             >
-                              Open / Manage
+                              Manage ➜
                             </button>
                           </td>
                         </tr>
@@ -1768,28 +1960,21 @@ export default function AdminDashboardPage() {
               </button>
             </form>
 
-            {/* Sub-navigation for Areas / Vehicles / Drivers */}
+            {/* Sub-navigation for Areas & Vehicles */}
             <div style={{ display: "flex", gap: "10px", marginBottom: "18px", borderBottom: "1px solid #e2e8f0", paddingBottom: "12px" }}>
               <button
                 type="button"
                 onClick={() => setDeliverySubTab("areas")}
                 className={`btn-action ${deliverySubTab === "areas" ? "primary" : "secondary"}`}
               >
-                📍 Delivery Areas & Prices ({deliveryAreas.length})
+                📍 Delivery Areas &amp; Prices ({deliveryAreas.length})
               </button>
               <button
                 type="button"
                 onClick={() => setDeliverySubTab("vehicles")}
                 className={`btn-action ${deliverySubTab === "vehicles" ? "primary" : "secondary"}`}
               >
-                🛵 Vehicles & Weight Limits ({deliveryVehicles.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeliverySubTab("drivers")}
-                className={`btn-action ${deliverySubTab === "drivers" ? "primary" : "secondary"}`}
-              >
-                👨‍✈️ Drivers Registry ({deliveryDrivers.length})
+                🛵 Vehicles &amp; Weight Capacities ({deliveryVehicles.length})
               </button>
             </div>
 
@@ -2070,192 +2255,6 @@ export default function AdminDashboardPage() {
                                       Edit
                                     </button>
                                     <button onClick={() => handleDeleteVehicle(v)} className="btn-tiny" style={{ color: "#dc2626" }}>
-                                      Delete
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* SUB-TAB 3: DRIVERS REGISTRY CRUD (AUTO-SYNCS TO SHOPIFY ORDERS DROPDOWN) */}
-            {deliverySubTab === "drivers" && (
-              <div>
-                <div style={{ fontSize: "13px", color: "#0f766e", background: "#f0fdfa", border: "1px solid #99f6e4", padding: "10px 14px", borderRadius: "8px", marginBottom: "14px" }}>
-                  ✓ <strong>Auto-Synced with Shopify Orders:</strong> Any driver you add, edit, or delete here automatically updates the <strong>Assigned Driver &amp; Vehicle</strong> dropdown inside your Shopify Orders page!
-                </div>
-
-                {/* Search & Vehicle Filter Bar + Register Driver Button */}
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: "10px",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: "16px",
-                    background: "#f8fafc",
-                    padding: "12px 14px",
-                    borderRadius: "8px",
-                    border: "1px solid #e2e8f0",
-                  }}
-                >
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", flex: "1 1 320px" }}>
-                    <input
-                      type="text"
-                      placeholder="🔍 Search driver name, phone, or plate..."
-                      value={driverSearch}
-                      onChange={(e) => setDriverSearch(e.target.value)}
-                      style={{ flex: "1 1 220px", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
-                    />
-                    <select
-                      value={driverVehicleFilter}
-                      onChange={(e) => setDriverVehicleFilter(e.target.value)}
-                      style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", background: "#fff" }}
-                    >
-                      <option value="ALL">All Vehicles</option>
-                      {deliveryVehicles.map((v) => (
-                        <option key={v.id} value={v.name}>
-                          {v.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddDriverModal(true)}
-                    className="btn-action primary"
-                    style={{ height: "36px" }}
-                  >
-                    + Register Driver
-                  </button>
-                </div>
-
-                <div className="table-responsive">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Driver Name</th>
-                        <th>Phone</th>
-                        <th>Vehicle</th>
-                        <th>Plate / ID</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {deliveryDrivers
-                        .filter((d) => {
-                          const q = driverSearch.trim().toLowerCase();
-                          const matchSearch =
-                            !q ||
-                            d.name.toLowerCase().includes(q) ||
-                            d.phone.toLowerCase().includes(q) ||
-                            (d.plate_number || "").toLowerCase().includes(q);
-                          const matchVehicle =
-                            driverVehicleFilter === "ALL" || d.vehicle_type === driverVehicleFilter;
-                          return matchSearch && matchVehicle;
-                        })
-                        .map((d) => (
-                          <tr key={d.id}>
-                            <td className="bold-cell">
-                              {editingDriverId === d.id ? (
-                                <input
-                                  type="text"
-                                  value={editDriverName}
-                                  onChange={(e) => setEditDriverName(e.target.value)}
-                                  style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                                />
-                              ) : (
-                                d.name
-                              )}
-                            </td>
-                            <td className="mono-cell">
-                              {editingDriverId === d.id ? (
-                                <input
-                                  type="text"
-                                  value={editDriverPhone}
-                                  onChange={(e) => setEditDriverPhone(e.target.value)}
-                                  style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                                />
-                              ) : (
-                                d.phone
-                              )}
-                            </td>
-                            <td>
-                              {editingDriverId === d.id ? (
-                                <input
-                                  type="text"
-                                  value={editDriverVehicle}
-                                  onChange={(e) => setEditDriverVehicle(e.target.value)}
-                                  style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                                />
-                              ) : (
-                                <span style={{ fontSize: "14px", fontWeight: 500, color: "#334155" }}>
-                                  {d.vehicle_type}
-                                </span>
-                              )}
-                            </td>
-                            <td>
-                              {editingDriverId === d.id ? (
-                                <input
-                                  type="text"
-                                  value={editDriverPlate}
-                                  onChange={(e) => setEditDriverPlate(e.target.value)}
-                                  style={{ width: "90px", padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                                />
-                              ) : (
-                                d.plate_number || "—"
-                              )}
-                            </td>
-                            <td>
-                              {editingDriverId === d.id ? (
-                                <select
-                                  value={editDriverStatus}
-                                  onChange={(e) => setEditDriverStatus(e.target.value)}
-                                  style={{ padding: "5px 8px", borderRadius: "5px", border: "1px solid #94a3b8" }}
-                                >
-                                  <option value="Available">Available</option>
-                                  <option value="On Delivery">On Delivery</option>
-                                  <option value="Off Duty">Off Duty</option>
-                                </select>
-                              ) : (
-                                <span className="status-pill active-pill">{d.status}</span>
-                              )}
-                            </td>
-                            <td>
-                              <div className="btn-group">
-                                {editingDriverId === d.id ? (
-                                  <>
-                                    <button onClick={() => handleSaveDriverEdit(d)} className="btn-tiny approve">
-                                      Save
-                                    </button>
-                                    <button onClick={() => setEditingDriverId(null)} className="btn-tiny">
-                                      Cancel
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={() => {
-                                        setEditingDriverId(d.id);
-                                        setEditDriverName(d.name);
-                                        setEditDriverPhone(d.phone);
-                                        setEditDriverVehicle(d.vehicle_type);
-                                        setEditDriverPlate(d.plate_number || "");
-                                        setEditDriverStatus(d.status || "Available");
-                                      }}
-                                      className="btn-tiny"
-                                    >
-                                      Edit
-                                    </button>
-                                    <button onClick={() => handleDeleteDriver(d)} className="btn-tiny" style={{ color: "#dc2626" }}>
                                       Delete
                                     </button>
                                   </>
@@ -3875,77 +3874,324 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* 2 Clean Side-by-Side Cards: Customer/Address + Logistics/Driver */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "14px", marginBottom: "18px" }}>
+            {/* 2 Clean Side-by-Side Cards: Customer/Address + Ijaar Driver & Customer Notification */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                gap: "14px",
+                marginBottom: "18px",
+              }}
+            >
               {/* Card 1: Customer & Address */}
-              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "14px" }}>
-                <div style={{ fontSize: "12px", fontWeight: 700, color: "#0f766e", textTransform: "uppercase", marginBottom: "10px" }}>
-                  👤 Customer &amp; Delivery Address
-                </div>
-                <div style={{ fontSize: "14px", marginBottom: "6px" }}>
-                  <strong>Name:</strong> {selectedOrder.customer_name}
-                </div>
-                <div style={{ fontSize: "14px", marginBottom: "6px" }}>
-                  <strong>Phone:</strong> {selectedOrder.phone}
-                </div>
-                <div style={{ fontSize: "14px", marginBottom: "6px" }}>
-                  <strong>Area &amp; Fee:</strong> {selectedOrder.delivery_area}
-                </div>
-                <div style={{ fontSize: "14px" }}>
-                  <strong>Detailed Address:</strong> {selectedOrder.detailed_address}
+              <div
+                style={{
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "10px",
+                  padding: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      color: "#0f766e",
+                      textTransform: "uppercase",
+                      marginBottom: "12px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span>👤 Customer &amp; Delivery Destination</span>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        color: "#0284c7",
+                        background: "#e0f2fe",
+                        padding: "2px 7px",
+                        borderRadius: "999px",
+                      }}
+                    >
+                      Shopify Synced
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>
+                    {selectedOrder.customer_name}
+                  </div>
+
+                  <div style={{ fontSize: "14px", color: "#475569", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <strong>Phone:</strong> {selectedOrder.phone}
+                  </div>
+
+                  {/* 1-Click WhatsApp & Call Customer Shortcuts */}
+                  <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
+                    {formatSomaliWhatsAppNumber(selectedOrder.phone) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const clean = formatSomaliWhatsAppNumber(selectedOrder.phone);
+                          const text = getDispatchWhatsAppText(selectedOrder, ijarDriverName, ijarDriverPhone, ijarVehicle);
+                          window.open(`https://wa.me/${clean}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+                        }}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "5px",
+                          background: "#22c55e",
+                          color: "#ffffff",
+                          border: "none",
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        📲 WhatsApp Customer
+                      </button>
+                    )}
+                    <a
+                      href={`tel:${selectedOrder.phone}`}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "5px",
+                        background: "#ffffff",
+                        color: "#0f172a",
+                        border: "1px solid #cbd5e1",
+                        padding: "6px 12px",
+                        borderRadius: "6px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        textDecoration: "none",
+                      }}
+                    >
+                      📞 Call Customer
+                    </a>
+                  </div>
+
+                  <div style={{ fontSize: "13px", color: "#334155", marginBottom: "6px", borderTop: "1px solid #e2e8f0", paddingTop: "10px" }}>
+                    <strong>Delivery Area:</strong> {selectedOrder.delivery_area}
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#334155" }}>
+                    <strong>Detailed Address:</strong> {selectedOrder.detailed_address || "Mogadishu"}
+                  </div>
                 </div>
               </div>
 
-              {/* Card 2: Weight, Vehicle & Driver Assignment */}
-              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "14px" }}>
-                <div style={{ fontSize: "12px", fontWeight: 700, color: "#15803d", textTransform: "uppercase", marginBottom: "10px" }}>
-                  🚚 Logistics &amp; Driver Assignment
+              {/* Card 2: Darawal Ijaar (Freelance / Hired Driver Dispatch) */}
+              <div
+                style={{
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: "10px",
+                  padding: "16px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    color: "#15803d",
+                    textTransform: "uppercase",
+                    marginBottom: "10px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span>🚚 Darawal Ijaar (Hired Delivery Driver)</span>
+                  <span style={{ fontSize: "11px", fontWeight: 600, color: "#166534", background: "#dcfce7", padding: "2px 8px", borderRadius: "999px" }}>
+                    On-Demand Dispatch
+                  </span>
                 </div>
-                <div style={{ fontSize: "14px", marginBottom: "6px" }}>
-                  <strong>Total Weight:</strong> {selectedOrder.order_weight}
+
+                {/* Weight & Recommended Vehicle notice */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "12px",
+                    background: "#ffffff",
+                    border: "1px solid #86efac",
+                    padding: "8px 10px",
+                    borderRadius: "6px",
+                    marginBottom: "12px",
+                    color: "#166534",
+                  }}
+                >
+                  <span>⚖️ Miisaanka: <strong>{selectedOrder.order_weight.split("(")[0].trim()}</strong></span>
+                  <span>🚗 Gaariga: <strong>{selectedOrder.recommended_vehicle.split("(")[0].trim()}</strong></span>
                 </div>
-                <div style={{ fontSize: "14px", marginBottom: "10px" }}>
-                  <strong>Recommended Vehicle:</strong> {selectedOrder.recommended_vehicle}
+
+                {/* Ijaar Driver Form */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "10px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>
+                      Magaca Darawalka Ijaarka:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Cabdi Cali"
+                      value={ijarDriverName}
+                      onChange={(e) => setIjarDriverName(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "7px 10px",
+                        borderRadius: "6px",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "13px",
+                        background: "#fff",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>
+                      Taleefanka Darawalka:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 0615123456"
+                      value={ijarDriverPhone}
+                      onChange={(e) => setIjarDriverPhone(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "7px 10px",
+                        borderRadius: "6px",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "13px",
+                        background: "#fff",
+                      }}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#1e293b", marginBottom: "4px" }}>
-                    Assigned Driver &amp; Vehicle:
-                  </label>
-                  <select
-                    value={selectedOrder.assigned_driver}
+
+                {/* Vehicle Selection Chips & Fare */}
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "12px" }}>
+                  <div style={{ flex: "1 1 auto" }}>
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>
+                      Nooca Gaariga:
+                    </label>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      {(["Bajaj", "Mooto", "Gaari"] as const).map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setIjarVehicle(v)}
+                          style={{
+                            flex: 1,
+                            padding: "5px 6px",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            borderRadius: "6px",
+                            border: ijarVehicle === v ? "2px solid #16a34a" : "1px solid #cbd5e1",
+                            background: ijarVehicle === v ? "#dcfce7" : "#ffffff",
+                            color: ijarVehicle === v ? "#15803d" : "#475569",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {v === "Bajaj" ? "🛺 Bajaj" : v === "Mooto" ? "🛵 Mooto" : "🚐 Gaari"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ width: "95px" }}>
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>
+                      Kirada ($):
+                    </label>
+                    <input
+                      type="number"
+                      step="0.25"
+                      value={ijarFareUsd}
+                      onChange={(e) => setIjarFareUsd(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "6px 8px",
+                        borderRadius: "6px",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "12px",
+                        background: "#fff",
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Dispatch & Customer Notification Actions */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={handleSaveIjarDriver}
                     disabled={savingOrderDispatch}
-                    onChange={(e) => {
-                      const nextDriver = e.target.value;
-                      const nextStage =
-                        !nextDriver.includes("Unassigned") && selectedOrder.workflow_stage === "NOT_PREPARED"
-                          ? "IN_PROCESS"
-                          : selectedOrder.workflow_stage;
-                      handleUpdateOrderDispatch(selectedOrder, {
-                        assigned_driver: nextDriver,
-                        workflow_stage: nextStage,
-                      });
-                    }}
                     style={{
-                      width: "100%",
-                      padding: "8px 10px",
+                      flex: "1 1 140px",
+                      background: "#0f766e",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "8px 12px",
                       borderRadius: "6px",
-                      border: "1px solid #86efac",
-                      background: "#fff",
-                      fontSize: "13px",
-                      fontWeight: 600,
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
                     }}
                   >
-                    <option value="Unassigned (Pending Dispatch)">Unassigned (Pending Dispatch)</option>
-                    {deliveryDrivers.map((d) => {
-                      const platePart = d.plate_number ? ` [${d.plate_number}]` : "";
-                      const label = `${d.vehicle_type}${platePart} — ${d.name} (${d.phone})`;
-                      return (
-                        <option key={d.id} value={label}>
-                          {label}
-                        </option>
-                      );
-                    })}
-                  </select>
+                    {savingOrderDispatch ? "Saving..." : "💾 Save Driver & Sync Shopify"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const clean = formatSomaliWhatsAppNumber(selectedOrder.phone);
+                      if (!clean) {
+                        alert("Customer phone number is missing or invalid.");
+                        return;
+                      }
+                      const text = getDispatchWhatsAppText(selectedOrder, ijarDriverName, ijarDriverPhone, ijarVehicle);
+                      window.open(`https://wa.me/${clean}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+                    }}
+                    style={{
+                      flex: "1 1 160px",
+                      background: "#16a34a",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    📲 U Dir Macaamiilka WhatsApp
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = getDispatchWhatsAppText(selectedOrder, ijarDriverName, ijarDriverPhone, ijarVehicle);
+                      navigator.clipboard.writeText(text);
+                      setCopiedSms(true);
+                      showFeedback("✓ Farriinta macaamiilka waa la nuulbiyay (Copied to clipboard)!");
+                      setTimeout(() => setCopiedSms(false), 3000);
+                    }}
+                    style={{
+                      flex: "1 1 auto",
+                      background: "#ffffff",
+                      color: "#334155",
+                      border: "1px solid #cbd5e1",
+                      padding: "8px 10px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {copiedSms ? "✓ Nuulbiyay!" : "📋 Nuulbee Farriinta (Copy SMS)"}
+                  </button>
                 </div>
               </div>
             </div>
