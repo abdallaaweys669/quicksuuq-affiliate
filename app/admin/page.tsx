@@ -1103,6 +1103,18 @@ export default function AdminDashboardPage() {
         <div className="polaris-nav-section-label">Operations</div>
         <button
           type="button"
+          className={`polaris-nav-item ${activeTab === "orders" ? "active" : ""}`}
+          onClick={() => setActiveTab("orders")}
+        >
+          <span className="polaris-nav-item-left">
+            <span>📦</span>
+            <span>Orders &amp; Dispatch</span>
+          </span>
+          <span className="polaris-nav-badge">{ordersList.length}</span>
+        </button>
+
+        <button
+          type="button"
           className={`polaris-nav-item ${activeTab === "delivery" ? "active" : ""}`}
           onClick={() => setActiveTab("delivery")}
         >
@@ -1358,6 +1370,12 @@ export default function AdminDashboardPage() {
         <section className="content-card">
           <div className="admin-toolbar">
             <div className="tabs-header">
+              <button
+                className={`tab-btn ${activeTab === "orders" ? "active" : ""}`}
+                onClick={() => setActiveTab("orders")}
+              >
+                📦 Orders &amp; Dispatch ({ordersList.length})
+              </button>
               <button
                 className={`tab-btn ${activeTab === "commissions" ? "active" : ""}`}
                 onClick={() => setActiveTab("commissions")}
