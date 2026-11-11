@@ -110,6 +110,68 @@ interface DispatchOrder {
   }>;
 }
 
+interface HeroSlideItem {
+  id: string;
+  enable_slide: boolean;
+  show_badge: boolean;
+  badge: string;
+  badge_bg_color: string;
+  badge_text_color: string;
+  heading: string;
+  description: string;
+  show_button: boolean;
+  button_text: string;
+  button_url: string;
+  button_style: string;
+  image_desktop: string;
+  custom_image_url: string;
+  image_preview_url: string;
+  image_position: string;
+  focal_point: string;
+  background_color: string;
+  show_green_circle: boolean;
+  circle_color: string;
+  show_float_card_1: boolean;
+  float_card_1_title: string;
+  float_card_1_sub: string;
+  show_float_pill: boolean;
+  float_pill_text: string;
+  show_float_card_2: boolean;
+  float_card_2_title: string;
+  float_card_2_price: string;
+  float_card_2_badge: string;
+}
+
+interface CategoryCardItem {
+  id: string;
+  enable_category: boolean;
+  title: string;
+  collection: string;
+  custom_url: string;
+  custom_image_url: string;
+  image_preview_url: string;
+}
+
+interface PromoBannerItem {
+  id: string;
+  enable_banner: boolean;
+  heading: string;
+  subheading: string;
+  show_button: boolean;
+  button_text: string;
+  button_url: string;
+  bg_color: string;
+  custom_image_url: string;
+  image_preview_url: string;
+}
+
+interface StoreCollectionOption {
+  id: number;
+  handle: string;
+  title: string;
+  image_src: string;
+}
+
 export default function AdminDashboardPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [passcode, setPasscode] = useState("");
@@ -118,8 +180,64 @@ export default function AdminDashboardPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<"orders" | "commissions" | "salespeople" | "payouts" | "delivery">("commissions");
+  const [activeTab, setActiveTab] = useState<
+    "orders" | "commissions" | "salespeople" | "payouts" | "delivery" | "storefront"
+  >("commissions");
   const [deliverySubTab, setDeliverySubTab] = useState<"areas" | "vehicles" | "drivers">("areas");
+  const [storefrontSubTab, setStorefrontSubTab] = useState<
+    "hero" | "categories" | "promos" | "products"
+  >("hero");
+
+  // Storefront CMS CRUD states
+  const [heroSlider, setHeroSlider] = useState<{
+    show_section: boolean;
+    autoplay: boolean;
+    autoplay_interval: number;
+    show_arrows: boolean;
+    show_dots: boolean;
+    slides: HeroSlideItem[];
+  }>({
+    show_section: true,
+    autoplay: true,
+    autoplay_interval: 5,
+    show_arrows: true,
+    show_dots: true,
+    slides: [],
+  });
+
+  const [featuredCategories, setFeaturedCategories] = useState<{
+    show_section: boolean;
+    heading: string;
+    categories: CategoryCardItem[];
+  }>({
+    show_section: true,
+    heading: "Featured Categories",
+    categories: [],
+  });
+
+  const [promoBanners, setPromoBanners] = useState<{
+    show_section: boolean;
+    banners: PromoBannerItem[];
+  }>({
+    show_section: true,
+    banners: [],
+  });
+
+  const [popularProducts, setPopularProducts] = useState<{
+    show_section: boolean;
+    heading: string;
+    products_limit: number;
+    show_badges: boolean;
+  }>({
+    show_section: true,
+    heading: "Popular Products",
+    products_limit: 10,
+    show_badges: true,
+  });
+
+  const [storeCollections, setStoreCollections] = useState<StoreCollectionOption[]>([]);
+  const [savingStorefront, setSavingStorefront] = useState(false);
+  const [uploadingImageKey, setUploadingImageKey] = useState<string | null>(null);
 
   // Orders & Dispatch 5-Tab state
   const [ordersList, setOrdersList] = useState<DispatchOrder[]>([]);
@@ -193,6 +311,48 @@ export default function AdminDashboardPage() {
   const [payoutTxRef, setPayoutTxRef] = useState("");
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (
+        tabParam === "commissions" ||
+        tabParam === "salespeople" ||
+        tabParam === "payouts" ||
+        tabParam === "delivery" ||
+        tabParam === "orders" ||
+        tabParam === "storefront"
+      ) {
+        setActiveTab(tabParam);
+      }
+      const subParam = params.get("sub");
+      if (
+        subParam === "hero" ||
+        subParam === "categories" ||
+        subParam === "promos" ||
+        subParam === "products"
+      ) {
+        setStorefrontSubTab(subParam);
+      }
+
+      // If embedded in Shopify with id_token, inject App Bridge v4 so <ui-nav-menu> renders under QuickSuuq Affiliate in Shopify's left sidebar
+      const idToken = params.get("id_token");
+      if (idToken && !document.querySelector('meta[name="shopify-api-key"]')) {
+        try {
+          const payload = JSON.parse(atob(idToken.split(".")[1]));
+          if (payload?.aud) {
+            const meta = document.createElement("meta");
+            meta.name = "shopify-api-key";
+            meta.content = payload.aud;
+            document.head.appendChild(meta);
+            const script = document.createElement("script");
+            script.src = "https://cdn.shopify.com/shopifycloud/app-bridge.js";
+            document.head.appendChild(script);
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
     checkAdmin();
   }, []);
 
@@ -240,12 +400,13 @@ export default function AdminDashboardPage() {
 
   async function loadAllData() {
     try {
-      const [repsRes, commsRes, paysRes, delivRes, ordsRes] = await Promise.all([
+      const [repsRes, commsRes, paysRes, delivRes, ordsRes, sfRes] = await Promise.all([
         adminFetch("/api/admin/salespeople"),
         adminFetch("/api/admin/commissions"),
         adminFetch("/api/admin/payouts"),
         adminFetch("/api/admin/delivery"),
         adminFetch("/api/admin/orders"),
+        adminFetch("/api/admin/storefront"),
       ]);
       if (repsRes.ok) {
         const d = await repsRes.json();
@@ -273,8 +434,81 @@ export default function AdminDashboardPage() {
         const d = await ordsRes.json();
         setOrdersList(d.orders || []);
       }
+      if (sfRes.ok) {
+        const d = await sfRes.json();
+        if (d.heroSlider) setHeroSlider(d.heroSlider);
+        if (d.featuredCategories) setFeaturedCategories(d.featuredCategories);
+        if (d.promoBanners) setPromoBanners(d.promoBanners);
+        if (d.popularProducts) setPopularProducts(d.popularProducts);
+        if (d.collections) setStoreCollections(d.collections);
+      }
     } catch (e) {
       console.error("Error loading admin data:", e);
+    }
+  }
+
+  async function handleSaveStorefront() {
+    setSavingStorefront(true);
+    try {
+      const res = await adminFetch("/api/admin/storefront", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save_storefront",
+          heroSlider,
+          featuredCategories,
+          promoBanners,
+          popularProducts,
+        }),
+      });
+      if (res.ok) {
+        showFeedback("Saved & Published Website Content to Shopify!");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Failed to publish storefront changes.");
+      }
+    } catch {
+      alert("Network error while saving storefront configuration.");
+    } finally {
+      setSavingStorefront(false);
+    }
+  }
+
+  async function handleUploadCmsImage(
+    file: File,
+    uploadKey: string,
+    onUploaded: (cdnUrl: string) => void,
+    collectionHandle?: string
+  ) {
+    setUploadingImageKey(uploadKey);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const res = await adminFetch("/api/admin/storefront", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "upload_image",
+          filename: file.name,
+          base64,
+          collectionHandle,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        onUploaded(data.url);
+        showFeedback("Image uploaded to Shopify CDN! Click 'Save & Publish' to apply.");
+      } else {
+        alert(data.error || "Failed to upload image");
+      }
+    } catch {
+      alert("Error uploading image file");
+    } finally {
+      setUploadingImageKey(null);
     }
   }
 
@@ -790,131 +1024,436 @@ export default function AdminDashboardPage() {
     (c) => statusFilter === "ALL" || c.status === statusFilter
   );
 
-  return (
-    <main className="portal-dashboard admin-view">
-      {feedbackMsg && <div className="toast-notification">{feedbackMsg}</div>}
+  const activeSlidesCount = heroSlider.slides.filter((s) => s.enable_slide).length;
+  const activeCategoriesCount = featuredCategories.categories.filter((c) => c.enable_category).length;
+  const activeBannersCount = promoBanners.banners.filter((b) => b.enable_banner).length;
+  const isAffiliateSection =
+    activeTab === "commissions" || activeTab === "salespeople" || activeTab === "payouts";
 
-      <header className="dashboard-topbar">
-        <div className="brand-group">
-          <Link href="/" className="brand-logo-wrap">
-            <Image
-              src="/logo.png"
-              alt="QuickSuuq"
-              width={160}
-              height={38}
-              priority
-              className="brand-logo-img"
-            />
-          </Link>
-          <div className="rep-header-info">
-            <h2 className="rep-name">Admin Management Console</h2>
-            <div className="rep-meta">
-              <span>QuickSuuq Partner Network</span>
-              <span className="muted">·</span>
-              <span className="rep-phone-tag">PostgreSQL 17 Live</span>
+  return (
+    <div className="polaris-admin-shell">
+      {/* Shopify App Bridge Navigation Menu (renders below QuickSuuq Affiliate in Shopify's black left sidebar) */}
+      {/* @ts-expect-error Shopify App Bridge custom web component */}
+      <ui-nav-menu>
+        <a href="/admin?tab=commissions" rel="home">
+          Commissions
+        </a>
+        <a href="/admin?tab=salespeople">Sales Team</a>
+        <a href="/admin?tab=payouts">Payouts &amp; Mobile Money</a>
+        <a href="/admin?tab=delivery">Delivery &amp; Logistics</a>
+        <a href="/admin?tab=storefront">Website Content (CMS)</a>
+        {/* @ts-expect-error Shopify App Bridge custom web component */}
+      </ui-nav-menu>
+
+      {/* Left Sidebar Navigation (Menus below QuickSuuq Affiliate) */}
+      <aside className="polaris-sidebar">
+        <div className="polaris-sidebar-brand">
+          <Image
+            src="/logo.png"
+            alt="QuickSuuq"
+            width={118}
+            height={28}
+            priority
+            className="brand-logo-img"
+            style={{ height: "24px" }}
+          />
+          <div>
+            <div className="polaris-sidebar-title">QuickSuuq App</div>
+            <div className="polaris-sidebar-sub">Store Management</div>
+          </div>
+        </div>
+
+        <div className="polaris-nav-section-label">Affiliate &amp; Partners</div>
+        <button
+          type="button"
+          className={`polaris-nav-item ${activeTab === "commissions" ? "active" : ""}`}
+          onClick={() => setActiveTab("commissions")}
+        >
+          <span className="polaris-nav-item-left">
+            <span>📊</span>
+            <span>Commissions</span>
+          </span>
+          <span className="polaris-nav-badge">{commissions.length}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`polaris-nav-item ${activeTab === "salespeople" ? "active" : ""}`}
+          onClick={() => setActiveTab("salespeople")}
+        >
+          <span className="polaris-nav-item-left">
+            <span>👥</span>
+            <span>Sales Team</span>
+          </span>
+          <span className="polaris-nav-badge">{salespeople.length}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`polaris-nav-item ${activeTab === "payouts" ? "active" : ""}`}
+          onClick={() => setActiveTab("payouts")}
+        >
+          <span className="polaris-nav-item-left">
+            <span>💸</span>
+            <span>Payouts &amp; EVC</span>
+          </span>
+          <span className="polaris-nav-badge">{payouts.length}</span>
+        </button>
+
+        <div className="polaris-nav-section-label">Operations</div>
+        <button
+          type="button"
+          className={`polaris-nav-item ${activeTab === "delivery" ? "active" : ""}`}
+          onClick={() => setActiveTab("delivery")}
+        >
+          <span className="polaris-nav-item-left">
+            <span>🚚</span>
+            <span>Delivery &amp; Logistics</span>
+          </span>
+          <span className="polaris-nav-badge">{deliveryAreas.length}</span>
+        </button>
+        {activeTab === "delivery" && (
+          <div className="polaris-nav-subitems">
+            <button
+              type="button"
+              className={`polaris-nav-subitem ${deliverySubTab === "areas" ? "active" : ""}`}
+              onClick={() => setDeliverySubTab("areas")}
+            >
+              <span>Delivery Areas</span>
+              <span>{deliveryAreas.length}</span>
+            </button>
+            <button
+              type="button"
+              className={`polaris-nav-subitem ${deliverySubTab === "vehicles" ? "active" : ""}`}
+              onClick={() => setDeliverySubTab("vehicles")}
+            >
+              <span>Vehicles &amp; Weights</span>
+              <span>{deliveryVehicles.length}</span>
+            </button>
+            <button
+              type="button"
+              className={`polaris-nav-subitem ${deliverySubTab === "drivers" ? "active" : ""}`}
+              onClick={() => setDeliverySubTab("drivers")}
+            >
+              <span>Drivers Registry</span>
+              <span>{deliveryDrivers.length}</span>
+            </button>
+          </div>
+        )}
+
+        <div className="polaris-nav-section-label">Online Store</div>
+        <button
+          type="button"
+          className={`polaris-nav-item ${activeTab === "storefront" ? "active" : ""}`}
+          onClick={() => setActiveTab("storefront")}
+        >
+          <span className="polaris-nav-item-left">
+            <span>🎨</span>
+            <span>Website Content</span>
+          </span>
+          <span className="polaris-nav-badge">CMS</span>
+        </button>
+        {activeTab === "storefront" && (
+          <div className="polaris-nav-subitems">
+            <button
+              type="button"
+              className={`polaris-nav-subitem ${storefrontSubTab === "hero" ? "active" : ""}`}
+              onClick={() => setStorefrontSubTab("hero")}
+            >
+              <span>Hero Carousel Slider</span>
+              <span>{activeSlidesCount}/{heroSlider.slides.length}</span>
+            </button>
+            <button
+              type="button"
+              className={`polaris-nav-subitem ${storefrontSubTab === "categories" ? "active" : ""}`}
+              onClick={() => setStorefrontSubTab("categories")}
+            >
+              <span>Featured Categories</span>
+              <span>{activeCategoriesCount}</span>
+            </button>
+            <button
+              type="button"
+              className={`polaris-nav-subitem ${storefrontSubTab === "promos" ? "active" : ""}`}
+              onClick={() => setStorefrontSubTab("promos")}
+            >
+              <span>Promo Banners</span>
+              <span>{activeBannersCount}/{promoBanners.banners.length}</span>
+            </button>
+            <button
+              type="button"
+              className={`polaris-nav-subitem ${storefrontSubTab === "products" ? "active" : ""}`}
+              onClick={() => setStorefrontSubTab("products")}
+            >
+              <span>Popular Products</span>
+            </button>
+          </div>
+        )}
+
+        <div style={{ marginTop: "auto", paddingTop: "14px", borderTop: "1px solid #dcdcdc" }}>
+          <a
+            href="https://quicksuuq-test.myshopify.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="polaris-nav-item"
+            style={{ textDecoration: "none", fontSize: "12px", color: "#167a62", fontWeight: 600 }}
+          >
+            <span>🌐 View Live Store</span>
+            <span>↗</span>
+          </a>
+        </div>
+      </aside>
+
+      {/* Main Polaris Content Area */}
+      <main className="polaris-main admin-view">
+        {feedbackMsg && <div className="toast-notification">{feedbackMsg}</div>}
+
+        <header className="dashboard-topbar">
+          <div className="brand-group">
+            <div className="rep-header-info">
+              <h2 className="rep-name">
+                {isAffiliateSection && "Affiliate & Commission Management"}
+                {activeTab === "delivery" && "Delivery & Logistics Management"}
+                {activeTab === "orders" && "Orders & Dispatch Board"}
+                {activeTab === "storefront" && "Website Content & Homepage CMS"}
+              </h2>
+              <div className="rep-meta">
+                <span>
+                  {isAffiliateSection && "Manage affiliate commissions, sales team referrals, and EVC Plus payouts"}
+                  {activeTab === "delivery" && "Manage Mogadishu delivery districts, fees, vehicle weight tiers, and drivers"}
+                  {activeTab === "orders" && "Track and dispatch customer orders across Mogadishu"}
+                  {activeTab === "storefront" && "Add, edit, show, or hide Hero Slider slides, Featured Categories, and Promo Banners"}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="topbar-actions">
-          <span className="rate-badge live">● Admin Authenticated</span>
-          <button onClick={handleLogout} className="btn-logout">Exit Admin</button>
-        </div>
-      </header>
-
-      {/* KPI Stats */}
-      <section className="metrics-grid admin-metrics">
-        <div className="metric-card">
-          <span className="metric-label">TOTAL MERCHANDISE</span>
-          <div className="metric-value">${totalSalesDriven.toFixed(2)}</div>
-          <span className="metric-sub">{totalOrders} affiliate orders</span>
-        </div>
-        <div className="metric-card highlight-pending">
-          <span className="metric-label">PENDING APPROVAL</span>
-          <div className="metric-value yellow">${pendingAmount.toFixed(2)}</div>
-          <span className="metric-sub">{commissions.filter((c) => c.status === "PENDING").length} orders pending</span>
-        </div>
-        <div className="metric-card highlight">
-          <span className="metric-label">READY FOR PAYOUT</span>
-          <div className="metric-value teal">${approvedUnpaid.toFixed(2)}</div>
-          <span className="metric-sub">Approved commissions</span>
-        </div>
-        <div className="metric-card">
-          <span className="metric-label">TOTAL PAID OUT</span>
-          <div className="metric-value">${totalPaidOut.toFixed(2)}</div>
-          <span className="metric-sub">{payouts.length} payout batches</span>
-        </div>
-      </section>
-
-      {/* Admin Tabs */}
-      <section className="content-card">
-        <div className="admin-toolbar">
-          <div className="tabs-header">
-            <button
-              className={`tab-btn ${activeTab === "commissions" ? "active" : ""}`}
-              onClick={() => setActiveTab("commissions")}
-            >
-              Commissions ({commissions.length})
-            </button>
-            <button
-              className={`tab-btn ${activeTab === "salespeople" ? "active" : ""}`}
-              onClick={() => setActiveTab("salespeople")}
-            >
-              Sales Team ({salespeople.length})
-            </button>
-            <button
-              className={`tab-btn ${activeTab === "payouts" ? "active" : ""}`}
-              onClick={() => setActiveTab("payouts")}
-            >
-              Payouts & Mobile Money ({payouts.length})
-            </button>
-            <button
-              className={`tab-btn ${activeTab === "delivery" ? "active" : ""}`}
-              onClick={() => setActiveTab("delivery")}
-            >
-              🚚 Delivery & Logistics ({deliveryAreas.length} Areas · {deliveryDrivers.length} Drivers)
-            </button>
-          </div>
-
-          <div className="toolbar-actions">
-            {activeTab === "commissions" && (
-              <div className="action-row">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="filter-select"
-                >
-                  <option value="ALL">All Statuses</option>
-                  <option value="PENDING">Pending Only</option>
-                  <option value="APPROVED">Approved Only</option>
-                  <option value="PAID">Paid Only</option>
-                  <option value="VOIDED">Voided Only</option>
-                </select>
-                {commissions.some((c) => c.status === "PENDING") && (
-                  <button onClick={handleBatchApprovePending} className="btn-action">
-                    ✓ Approve All Pending
-                  </button>
-                )}
-              </div>
-            )}
-
-            {activeTab === "salespeople" && (
-              <button onClick={() => setShowAddRep(true)} className="btn-action primary">
-                + Add New Salesperson
+          <div className="topbar-actions">
+            {activeTab === "storefront" && (
+              <button
+                type="button"
+                onClick={handleSaveStorefront}
+                disabled={savingStorefront}
+                className="btn-action brand"
+              >
+                {savingStorefront ? "Publishing..." : "✓ Save & Publish to Store"}
               </button>
             )}
-
-            {activeTab === "payouts" && (
-              <div className="action-row">
-                <a href="/api/admin/payouts/export?scope=approved" className="btn-action secondary" download>
-                  📥 Export EVC Plus CSV
-                </a>
-                <button onClick={() => setShowPayoutModal(true)} className="btn-action primary">
-                  💸 Record Payout Batch
-                </button>
-              </div>
-            )}
+            <span className="rate-badge live">● Live Sync</span>
+            <button onClick={handleLogout} className="btn-logout">
+              Exit
+            </button>
           </div>
-        </div>
+        </header>
+
+        {/* Context-Aware Top Summary Cards (Only show Sales Cards on Affiliate Tabs!) */}
+        {isAffiliateSection && (
+          <section className="metrics-grid admin-metrics">
+            <div className="metric-card">
+              <span className="metric-label">Total Merchandise</span>
+              <div className="metric-value">${totalSalesDriven.toFixed(2)}</div>
+              <span className="metric-sub">{totalOrders} affiliate orders</span>
+            </div>
+            <div className="metric-card highlight-pending">
+              <span className="metric-label">Pending Approval</span>
+              <div className="metric-value yellow">${pendingAmount.toFixed(2)}</div>
+              <span className="metric-sub">
+                {commissions.filter((c) => c.status === "PENDING").length} orders pending
+              </span>
+            </div>
+            <div className="metric-card highlight">
+              <span className="metric-label">Ready for Payout</span>
+              <div className="metric-value teal">${approvedUnpaid.toFixed(2)}</div>
+              <span className="metric-sub">Approved commissions</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-label">Total Paid Out</span>
+              <div className="metric-value">${totalPaidOut.toFixed(2)}</div>
+              <span className="metric-sub">{payouts.length} payout batches</span>
+            </div>
+          </section>
+        )}
+
+        {activeTab === "delivery" && (
+          <section className="metrics-grid admin-metrics">
+            <div className="metric-card">
+              <span className="metric-label">Delivery Zones</span>
+              <div className="metric-value">
+                {deliveryAreas.filter((a) => a.is_active).length} / {deliveryAreas.length}
+              </div>
+              <span className="metric-sub">Active Mogadishu districts</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-label">Registered Drivers</span>
+              <div className="metric-value teal">{deliveryDrivers.length}</div>
+              <span className="metric-sub">Synced with Shopify Orders</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-label">Vehicle Tiers</span>
+              <div className="metric-value">{deliveryVehicles.length}</div>
+              <span className="metric-sub">Weight-based dispatch</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-label">Heavy Order Surcharge</span>
+              <div className="metric-value">+${heavySurchargeUsd}</div>
+              <span className="metric-sub">Orders over {heavyWeightKg} kg</span>
+            </div>
+          </section>
+        )}
+
+        {activeTab === "storefront" && (
+          <section className="metrics-grid admin-metrics">
+            <div
+              className="metric-card"
+              style={{ cursor: "pointer" }}
+              onClick={() => setStorefrontSubTab("hero")}
+            >
+              <span className="metric-label">Hero Carousel Slider</span>
+              <div className="metric-value teal">
+                {heroSlider.show_section ? `${activeSlidesCount} Active` : "Hidden"}
+              </div>
+              <span className="metric-sub">
+                {heroSlider.slides.length} total slides configured
+              </span>
+            </div>
+            <div
+              className="metric-card"
+              style={{ cursor: "pointer" }}
+              onClick={() => setStorefrontSubTab("categories")}
+            >
+              <span className="metric-label">Featured Categories</span>
+              <div className="metric-value">
+                {featuredCategories.show_section ? `${activeCategoriesCount} Visible` : "Hidden"}
+              </div>
+              <span className="metric-sub">Main category cover photos</span>
+            </div>
+            <div
+              className="metric-card"
+              style={{ cursor: "pointer" }}
+              onClick={() => setStorefrontSubTab("promos")}
+            >
+              <span className="metric-label">Promo Banners</span>
+              <div className="metric-value">
+                {promoBanners.show_section
+                  ? `${activeBannersCount} / ${promoBanners.banners.length} Active`
+                  : "Hidden"}
+              </div>
+              <span className="metric-sub">Fruits &amp; Veg / Baked Buns</span>
+            </div>
+            <div
+              className="metric-card"
+              style={{ cursor: "pointer" }}
+              onClick={() => setStorefrontSubTab("products")}
+            >
+              <span className="metric-label">Popular Products</span>
+              <div className="metric-value">
+                {popularProducts.show_section
+                  ? `${popularProducts.products_limit} Items`
+                  : "Hidden"}
+              </div>
+              <span className="metric-sub">Homepage product grid</span>
+            </div>
+          </section>
+        )}
+
+        {/* Top Horizontal Tabs + Context Toolbar */}
+        <section className="content-card">
+          <div className="admin-toolbar">
+            <div className="tabs-header">
+              <button
+                className={`tab-btn ${activeTab === "commissions" ? "active" : ""}`}
+                onClick={() => setActiveTab("commissions")}
+              >
+                Commissions ({commissions.length})
+              </button>
+              <button
+                className={`tab-btn ${activeTab === "salespeople" ? "active" : ""}`}
+                onClick={() => setActiveTab("salespeople")}
+              >
+                Sales Team ({salespeople.length})
+              </button>
+              <button
+                className={`tab-btn ${activeTab === "payouts" ? "active" : ""}`}
+                onClick={() => setActiveTab("payouts")}
+              >
+                Payouts &amp; Mobile Money ({payouts.length})
+              </button>
+              <button
+                className={`tab-btn ${activeTab === "delivery" ? "active" : ""}`}
+                onClick={() => setActiveTab("delivery")}
+              >
+                🚚 Delivery &amp; Logistics ({deliveryAreas.length})
+              </button>
+              <button
+                className={`tab-btn ${activeTab === "storefront" ? "active" : ""}`}
+                onClick={() => setActiveTab("storefront")}
+              >
+                🎨 Website Content (CMS)
+              </button>
+            </div>
+
+            <div className="toolbar-actions">
+              {activeTab === "commissions" && (
+                <div className="action-row">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="filter-select"
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="PENDING">Pending Only</option>
+                    <option value="APPROVED">Approved Only</option>
+                    <option value="PAID">Paid Only</option>
+                    <option value="VOIDED">Voided Only</option>
+                  </select>
+                  {commissions.some((c) => c.status === "PENDING") && (
+                    <button onClick={handleBatchApprovePending} className="btn-action primary">
+                      ✓ Approve All Pending
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {activeTab === "salespeople" && (
+                <button onClick={() => setShowAddRep(true)} className="btn-action primary">
+                  + Add New Salesperson
+                </button>
+              )}
+
+              {activeTab === "payouts" && (
+                <div className="action-row">
+                  <a
+                    href="/api/admin/payouts/export?scope=approved"
+                    className="btn-action secondary"
+                    download
+                  >
+                    📥 Export EVC Plus CSV
+                  </a>
+                  <button onClick={() => setShowPayoutModal(true)} className="btn-action primary">
+                    💸 Record Payout Batch
+                  </button>
+                </div>
+              )}
+
+              {activeTab === "storefront" && (
+                <div className="action-row">
+                  <button
+                    type="button"
+                    onClick={loadAllData}
+                    className="btn-action secondary"
+                  >
+                    ↻ Reload from Store
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveStorefront}
+                    disabled={savingStorefront}
+                    className="btn-action brand"
+                  >
+                    {savingStorefront ? "Publishing..." : "✓ Save & Publish"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
 
         {/* Tab 0: Orders & Dispatch (5-Tab Workflow Board) */}
         {activeTab === "orders" && (
@@ -1877,6 +2416,1195 @@ export default function AdminDashboardPage() {
             )}
           </div>
         )}
+
+        {/* Tab 5: Website Content (CMS) CRUD */}
+        {activeTab === "storefront" && (
+          <div style={{ padding: "18px 20px" }}>
+            {/* Sub-navigation for Hero Slider / Featured Categories / Promo Banners / Popular Products */}
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "10px",
+                marginBottom: "18px",
+                borderBottom: "1px solid #e3e3e3",
+                paddingBottom: "12px",
+              }}
+            >
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                <button
+                  type="button"
+                  onClick={() => setStorefrontSubTab("hero")}
+                  className={`btn-action ${storefrontSubTab === "hero" ? "primary" : "secondary"}`}
+                >
+                  🖼️ Hero Carousel Slider ({activeSlidesCount}/{heroSlider.slides.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStorefrontSubTab("categories")}
+                  className={`btn-action ${storefrontSubTab === "categories" ? "primary" : "secondary"}`}
+                >
+                  🗂️ Featured Categories ({activeCategoriesCount}/{featuredCategories.categories.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStorefrontSubTab("promos")}
+                  className={`btn-action ${storefrontSubTab === "promos" ? "primary" : "secondary"}`}
+                >
+                  🏷️ Promo Banners ({activeBannersCount}/{promoBanners.banners.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStorefrontSubTab("products")}
+                  className={`btn-action ${storefrontSubTab === "products" ? "primary" : "secondary"}`}
+                >
+                  🛍️ Popular Products
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveStorefront}
+                disabled={savingStorefront}
+                className="btn-action brand"
+              >
+                {savingStorefront ? "Publishing to Shopify..." : "✓ Save & Publish Changes"}
+              </button>
+            </div>
+
+            {/* ==============================================================
+                CMS SUB-TAB 1: HERO CAROUSEL SLIDER CRUD
+               ============================================================== */}
+            {storefrontSubTab === "hero" && (
+              <div>
+                {/* Global Hero Slider Controls Bar */}
+                <div
+                  style={{
+                    background: "#f7f7f7",
+                    border: "1px solid #e3e3e3",
+                    borderRadius: "10px",
+                    padding: "14px 16px",
+                    marginBottom: "18px",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "14px",
+                  }}
+                >
+                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "18px" }}>
+                    <label className="polaris-switch">
+                      <input
+                        type="checkbox"
+                        checked={heroSlider.show_section}
+                        onChange={(e) =>
+                          setHeroSlider((prev) => ({ ...prev, show_section: e.target.checked }))
+                        }
+                      />
+                      <span className="polaris-switch-track">
+                        <span className="polaris-switch-thumb" />
+                      </span>
+                      <span>
+                        <strong>Show Hero Slider Section</strong>{" "}
+                        <span style={{ color: "#616161", fontWeight: 400 }}>
+                          ({heroSlider.show_section ? "Visible on Homepage" : "Hidden"})
+                        </span>
+                      </span>
+                    </label>
+
+                    <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px" }}>
+                      <input
+                        type="checkbox"
+                        checked={heroSlider.autoplay}
+                        onChange={(e) =>
+                          setHeroSlider((prev) => ({ ...prev, autoplay: e.target.checked }))
+                        }
+                      />
+                      <span>Autoplay Slides</span>
+                    </label>
+
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px" }}>
+                      <span>Interval (sec):</span>
+                      <input
+                        type="number"
+                        min={3}
+                        max={12}
+                        value={heroSlider.autoplay_interval}
+                        onChange={(e) =>
+                          setHeroSlider((prev) => ({
+                            ...prev,
+                            autoplay_interval: Number(e.target.value) || 5,
+                          }))
+                        }
+                        style={{
+                          width: "58px",
+                          padding: "4px 8px",
+                          borderRadius: "6px",
+                          border: "1px solid #cccccc",
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn-action primary"
+                    onClick={() => {
+                      const nextIdx = heroSlider.slides.length + 1;
+                      const newSlide: HeroSlideItem = {
+                        id: `slide_${Date.now()}`,
+                        enable_slide: true,
+                        show_badge: true,
+                        badge: "Fresh Groceries • Fast Delivery",
+                        badge_bg_color: "#FFC107",
+                        badge_text_color: "#001E2B",
+                        heading: `New Hero Slide ${nextIdx}`,
+                        description:
+                          "Shop fresh fruits, vegetables, grains, dairy and home essentials at great prices on QuickSuuq.",
+                        show_button: true,
+                        button_text: "Shop Now",
+                        button_url: "/collections/all",
+                        button_style: "navy",
+                        image_desktop: "",
+                        custom_image_url: "",
+                        image_preview_url:
+                          "https://cdn.shopify.com/s/files/1/1033/7402/9166/t/3/assets/quicksuuq-hero-slide-1-v2.png",
+                        image_position: "right",
+                        focal_point: "center center",
+                        background_color: "#CFE9DF",
+                        show_green_circle: true,
+                        circle_color: "#167A62",
+                        show_float_card_1: true,
+                        float_card_1_title: "Bananas - 1kg",
+                        float_card_1_sub: "Fresh Daily",
+                        show_float_pill: true,
+                        float_pill_text: "Delivery Done!",
+                        show_float_card_2: false,
+                        float_card_2_title: "Avocado",
+                        float_card_2_price: "$1.80",
+                        float_card_2_badge: "-15%",
+                      };
+                      setHeroSlider((prev) => ({
+                        ...prev,
+                        slides: [...prev.slides, newSlide],
+                      }));
+                    }}
+                  >
+                    + Add New Slide
+                  </button>
+                </div>
+
+                {/* Individual Slide CRUD Cards */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {heroSlider.slides.map((slide, idx) => {
+                    const updateSlide = (patch: Partial<HeroSlideItem>) => {
+                      setHeroSlider((prev) => ({
+                        ...prev,
+                        slides: prev.slides.map((s, i) => (i === idx ? { ...s, ...patch } : s)),
+                      }));
+                    };
+
+                    return (
+                      <div
+                        key={slide.id}
+                        style={{
+                          background: "#ffffff",
+                          border: slide.enable_slide ? "1px solid #cccccc" : "1px dashed #cccccc",
+                          borderRadius: "12px",
+                          overflow: "hidden",
+                          opacity: slide.enable_slide ? 1 : 0.72,
+                        }}
+                      >
+                        {/* Slide Card Header */}
+                        <div
+                          style={{
+                            background: "#f7f7f7",
+                            padding: "10px 16px",
+                            borderBottom: "1px solid #e3e3e3",
+                            display: "flex",
+                            flexWrap: "wrap",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "10px",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <span
+                              style={{
+                                fontWeight: 650,
+                                fontSize: "13.5px",
+                                color: "#1a1a1a",
+                              }}
+                            >
+                              Slide {idx + 1}: {slide.heading || "Untitled Slide"}
+                            </span>
+                            <span
+                              className={`status-pill ${
+                                slide.enable_slide ? "active-pill" : "voided"
+                              }`}
+                            >
+                              {slide.enable_slide ? "Visible" : "Hidden"}
+                            </span>
+                          </div>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                            <label className="polaris-switch">
+                              <input
+                                type="checkbox"
+                                checked={slide.enable_slide}
+                                onChange={(e) => updateSlide({ enable_slide: e.target.checked })}
+                              />
+                              <span className="polaris-switch-track">
+                                <span className="polaris-switch-thumb" />
+                              </span>
+                              <span>{slide.enable_slide ? "Show Slide" : "Hidden"}</span>
+                            </label>
+
+                            {idx > 0 && (
+                              <button
+                                type="button"
+                                className="btn-tiny"
+                                title="Move Slide Up"
+                                onClick={() => {
+                                  setHeroSlider((prev) => {
+                                    const arr = [...prev.slides];
+                                    const temp = arr[idx - 1];
+                                    arr[idx - 1] = arr[idx];
+                                    arr[idx] = temp;
+                                    return { ...prev, slides: arr };
+                                  });
+                                }}
+                              >
+                                ↑
+                              </button>
+                            )}
+                            {idx < heroSlider.slides.length - 1 && (
+                              <button
+                                type="button"
+                                className="btn-tiny"
+                                title="Move Slide Down"
+                                onClick={() => {
+                                  setHeroSlider((prev) => {
+                                    const arr = [...prev.slides];
+                                    const temp = arr[idx + 1];
+                                    arr[idx + 1] = arr[idx];
+                                    arr[idx] = temp;
+                                    return { ...prev, slides: arr };
+                                  });
+                                }}
+                              >
+                                ↓
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="btn-tiny"
+                              style={{ color: "#8e1f0b" }}
+                              onClick={() => {
+                                if (!confirm(`Delete Slide ${idx + 1}?`)) return;
+                                setHeroSlider((prev) => ({
+                                  ...prev,
+                                  slides: prev.slides.filter((_, i) => i !== idx),
+                                }));
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Slide Card Body (2 Columns: Visual Image + Text/Buttons) */}
+                        <div
+                          style={{
+                            padding: "16px",
+                            display: "grid",
+                            gridTemplateColumns: "minmax(250px, 310px) 1fr",
+                            gap: "20px",
+                          }}
+                        >
+                          {/* Column 1: Image Preview & Upload */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                            <div
+                              style={{
+                                background: slide.background_color || "#CFE9DF",
+                                borderRadius: "10px",
+                                border: "1px solid #e3e3e3",
+                                height: "190px",
+                                position: "relative",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                overflow: "hidden",
+                              }}
+                            >
+                              {slide.show_green_circle && (
+                                <div
+                                  style={{
+                                    width: "130px",
+                                    height: "130px",
+                                    borderRadius: "50%",
+                                    background: slide.circle_color || "#167A62",
+                                    position: "absolute",
+                                  }}
+                                />
+                              )}
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={slide.custom_image_url || slide.image_preview_url}
+                                alt={slide.heading}
+                                style={{
+                                  position: "relative",
+                                  zIndex: 2,
+                                  maxHeight: "175px",
+                                  maxWidth: "90%",
+                                  objectFit: "contain",
+                                }}
+                              />
+                            </div>
+
+                            <label
+                              className="btn-action secondary"
+                              style={{
+                                justifyContent: "center",
+                                cursor: "pointer",
+                                width: "100%",
+                              }}
+                            >
+                              {uploadingImageKey === slide.id
+                                ? "Uploading to Shopify..."
+                                : "📷 Upload New Slide Image"}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                style={{ display: "none" }}
+                                disabled={uploadingImageKey === slide.id}
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f) {
+                                    handleUploadCmsImage(f, slide.id, (cdnUrl) => {
+                                      updateSlide({
+                                        custom_image_url: cdnUrl,
+                                        image_preview_url: cdnUrl,
+                                      });
+                                    });
+                                  }
+                                }}
+                              />
+                            </label>
+
+                            <div className="modal-grid-2">
+                              <div className="form-group">
+                                <label>Image Side</label>
+                                <select
+                                  value={slide.image_position}
+                                  onChange={(e) => updateSlide({ image_position: e.target.value })}
+                                >
+                                  <option value="right">Image on Right</option>
+                                  <option value="left">Image on Left</option>
+                                </select>
+                              </div>
+                              <div className="form-group">
+                                <label>Slide Background</label>
+                                <input
+                                  type="color"
+                                  value={slide.background_color || "#CFE9DF"}
+                                  onChange={(e) => updateSlide({ background_color: e.target.value })}
+                                  style={{ width: "100%", height: "36px", padding: "2px 4px" }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Column 2: Text, Badge, Button & Floating Callouts */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                            <div className="modal-grid-2">
+                              <div className="form-group">
+                                <label>Heading</label>
+                                <input
+                                  type="text"
+                                  value={slide.heading}
+                                  onChange={(e) => updateSlide({ heading: e.target.value })}
+                                  placeholder="Your Daily Groceries Delivered..."
+                                />
+                              </div>
+                              <div className="form-group">
+                                <div className="form-label-row">
+                                  <label>Promotional Badge</label>
+                                  <label style={{ fontSize: "11.5px", fontWeight: 500 }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={slide.show_badge}
+                                      onChange={(e) => updateSlide({ show_badge: e.target.checked })}
+                                    />{" "}
+                                    Show
+                                  </label>
+                                </div>
+                                <input
+                                  type="text"
+                                  value={slide.badge}
+                                  onChange={(e) => updateSlide({ badge: e.target.value })}
+                                  placeholder="Fresh Groceries • Fast Delivery"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="form-group">
+                              <label>Description</label>
+                              <textarea
+                                rows={2}
+                                value={slide.description}
+                                onChange={(e) => updateSlide({ description: e.target.value })}
+                                placeholder="Shop fresh fruits, vegetables, grains, dairy..."
+                              />
+                            </div>
+
+                            <div className="modal-grid-2">
+                              <div className="form-group">
+                                <div className="form-label-row">
+                                  <label>Button Text</label>
+                                  <label style={{ fontSize: "11.5px", fontWeight: 500 }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={slide.show_button}
+                                      onChange={(e) =>
+                                        updateSlide({ show_button: e.target.checked })
+                                      }
+                                    />{" "}
+                                    Show Button
+                                  </label>
+                                </div>
+                                <input
+                                  type="text"
+                                  value={slide.button_text}
+                                  onChange={(e) => updateSlide({ button_text: e.target.value })}
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label>Button Link URL</label>
+                                <input
+                                  type="text"
+                                  value={slide.button_url}
+                                  onChange={(e) => updateSlide({ button_url: e.target.value })}
+                                  placeholder="/collections/all"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Floating Callouts Controls */}
+                            <div
+                              style={{
+                                background: "#f7f7f7",
+                                border: "1px solid #e3e3e3",
+                                borderRadius: "8px",
+                                padding: "10px 12px",
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                                gap: "10px",
+                              }}
+                            >
+                              <div>
+                                <label
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={slide.show_float_card_1}
+                                    onChange={(e) =>
+                                      updateSlide({ show_float_card_1: e.target.checked })
+                                    }
+                                  />
+                                  Floating Card 1
+                                </label>
+                                <input
+                                  type="text"
+                                  value={slide.float_card_1_title}
+                                  onChange={(e) =>
+                                    updateSlide({ float_card_1_title: e.target.value })
+                                  }
+                                  placeholder="Bananas - 1kg"
+                                  style={{
+                                    width: "100%",
+                                    padding: "5px 8px",
+                                    fontSize: "12px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #cccccc",
+                                  }}
+                                />
+                              </div>
+
+                              <div>
+                                <label
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={slide.show_float_pill}
+                                    onChange={(e) =>
+                                      updateSlide({ show_float_pill: e.target.checked })
+                                    }
+                                  />
+                                  Bottom Delivery Pill
+                                </label>
+                                <input
+                                  type="text"
+                                  value={slide.float_pill_text}
+                                  onChange={(e) => updateSlide({ float_pill_text: e.target.value })}
+                                  placeholder="Delivery Done!"
+                                  style={{
+                                    width: "100%",
+                                    padding: "5px 8px",
+                                    fontSize: "12px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #cccccc",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ==============================================================
+                CMS SUB-TAB 2: FEATURED CATEGORIES CRUD
+               ============================================================== */}
+            {storefrontSubTab === "categories" && (
+              <div>
+                <div
+                  style={{
+                    background: "#f7f7f7",
+                    border: "1px solid #e3e3e3",
+                    borderRadius: "10px",
+                    padding: "14px 16px",
+                    marginBottom: "18px",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "14px",
+                  }}
+                >
+                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "18px" }}>
+                    <label className="polaris-switch">
+                      <input
+                        type="checkbox"
+                        checked={featuredCategories.show_section}
+                        onChange={(e) =>
+                          setFeaturedCategories((prev) => ({
+                            ...prev,
+                            show_section: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span className="polaris-switch-track">
+                        <span className="polaris-switch-thumb" />
+                      </span>
+                      <span>
+                        <strong>Show Featured Categories Section</strong>
+                      </span>
+                    </label>
+
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "12.5px", fontWeight: 600 }}>Section Heading:</span>
+                      <input
+                        type="text"
+                        value={featuredCategories.heading}
+                        onChange={(e) =>
+                          setFeaturedCategories((prev) => ({ ...prev, heading: e.target.value }))
+                        }
+                        style={{
+                          padding: "5px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #cccccc",
+                          fontSize: "13px",
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn-action primary"
+                    onClick={() => {
+                      const firstCol = storeCollections[0];
+                      const newCat: CategoryCardItem = {
+                        id: `cat_${Date.now()}`,
+                        enable_category: true,
+                        title: firstCol?.title || "New Category",
+                        collection: firstCol?.handle || "all",
+                        custom_url: "",
+                        custom_image_url: "",
+                        image_preview_url:
+                          firstCol?.image_src ||
+                          "https://freshcart.codescandy.com/assets/images/category/category-fruits-vegetables.jpg",
+                      };
+                      setFeaturedCategories((prev) => ({
+                        ...prev,
+                        categories: [...prev.categories, newCat],
+                      }));
+                    }}
+                  >
+                    + Add Category Card
+                  </button>
+                </div>
+
+                {/* Grid of Category CRUD Cards */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
+                    gap: "14px",
+                  }}
+                >
+                  {featuredCategories.categories.map((cat, idx) => {
+                    const updateCat = (patch: Partial<CategoryCardItem>) => {
+                      setFeaturedCategories((prev) => ({
+                        ...prev,
+                        categories: prev.categories.map((c, i) =>
+                          i === idx ? { ...c, ...patch } : c
+                        ),
+                      }));
+                    };
+
+                    return (
+                      <div
+                        key={cat.id}
+                        style={{
+                          background: "#ffffff",
+                          border: cat.enable_category
+                            ? "1px solid #cccccc"
+                            : "1px dashed #cccccc",
+                          borderRadius: "10px",
+                          padding: "14px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "10px",
+                          opacity: cat.enable_category ? 1 : 0.65,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <label className="polaris-switch">
+                            <input
+                              type="checkbox"
+                              checked={cat.enable_category}
+                              onChange={(e) =>
+                                updateCat({ enable_category: e.target.checked })
+                              }
+                            />
+                            <span className="polaris-switch-track">
+                              <span className="polaris-switch-thumb" />
+                            </span>
+                            <span style={{ fontSize: "12px" }}>
+                              {cat.enable_category ? "Visible" : "Hidden"}
+                            </span>
+                          </label>
+
+                          <button
+                            type="button"
+                            className="btn-tiny"
+                            style={{ color: "#8e1f0b", padding: "2px 7px" }}
+                            onClick={() => {
+                              if (!confirm(`Remove category "${cat.title}"?`)) return;
+                              setFeaturedCategories((prev) => ({
+                                ...prev,
+                                categories: prev.categories.filter((_, i) => i !== idx),
+                              }));
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        {/* Category Main Cover Image Preview */}
+                        <div
+                          style={{
+                            height: "110px",
+                            background: "#f7f7f7",
+                            borderRadius: "8px",
+                            border: "1px solid #ebebeb",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            padding: "8px",
+                          }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={cat.custom_image_url || cat.image_preview_url}
+                            alt={cat.title}
+                            style={{
+                              maxHeight: "94px",
+                              maxWidth: "100%",
+                              objectFit: "contain",
+                            }}
+                          />
+                        </div>
+
+                        <label
+                          className="btn-action secondary"
+                          style={{
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            width: "100%",
+                            fontSize: "12px",
+                          }}
+                        >
+                          {uploadingImageKey === cat.id
+                            ? "Uploading..."
+                            : "📷 Change Main Image"}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: "none" }}
+                            disabled={uploadingImageKey === cat.id}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) {
+                                handleUploadCmsImage(
+                                  f,
+                                  cat.id,
+                                  (cdnUrl) => {
+                                    updateCat({
+                                      custom_image_url: cdnUrl,
+                                      image_preview_url: cdnUrl,
+                                    });
+                                  },
+                                  cat.collection
+                                );
+                              }
+                            }}
+                          />
+                        </label>
+
+                        <div className="form-group">
+                          <label>Category Title</label>
+                          <input
+                            type="text"
+                            value={cat.title}
+                            onChange={(e) => updateCat({ title: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label>Linked Collection</label>
+                          <select
+                            value={cat.collection}
+                            onChange={(e) => {
+                              const nextHandle = e.target.value;
+                              const found = storeCollections.find(
+                                (sc) => sc.handle === nextHandle
+                              );
+                              updateCat({
+                                collection: nextHandle,
+                                title: found ? found.title : cat.title,
+                                image_preview_url:
+                                  found?.image_src || cat.image_preview_url,
+                              });
+                            }}
+                          >
+                            <option value="">-- Select Collection --</option>
+                            {storeCollections.map((sc) => (
+                              <option key={sc.handle} value={sc.handle}>
+                                {sc.title} ({sc.handle})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ==============================================================
+                CMS SUB-TAB 3: PROMO BANNERS CRUD ("Fruits & Veg" / "Baked Buns")
+               ============================================================== */}
+            {storefrontSubTab === "promos" && (
+              <div>
+                <div
+                  style={{
+                    background: "#f7f7f7",
+                    border: "1px solid #e3e3e3",
+                    borderRadius: "10px",
+                    padding: "14px 16px",
+                    marginBottom: "18px",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "14px",
+                  }}
+                >
+                  <label className="polaris-switch">
+                    <input
+                      type="checkbox"
+                      checked={promoBanners.show_section}
+                      onChange={(e) =>
+                        setPromoBanners((prev) => ({
+                          ...prev,
+                          show_section: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span className="polaris-switch-track">
+                      <span className="polaris-switch-thumb" />
+                    </span>
+                    <span>
+                      <strong>Show Promo Banners Section</strong>{" "}
+                      <span style={{ color: "#616161", fontWeight: 400 }}>
+                        (Toggle individual cards below to show 1, show 2, or hide all)
+                      </span>
+                    </span>
+                  </label>
+
+                  <button
+                    type="button"
+                    className="btn-action primary"
+                    onClick={() => {
+                      const newBanner: PromoBannerItem = {
+                        id: `banner_${Date.now()}`,
+                        enable_banner: true,
+                        heading: "Special Grocery Offer",
+                        subheading: "Get Upto 20% Off",
+                        show_button: true,
+                        button_text: "Shop Now",
+                        button_url: "/collections/all",
+                        bg_color: "#F0F3F2",
+                        custom_image_url: "",
+                        image_preview_url:
+                          "https://freshcart.codescandy.com/assets/images/banner/grocery-banner.png",
+                      };
+                      setPromoBanners((prev) => ({
+                        ...prev,
+                        banners: [...prev.banners, newBanner],
+                      }));
+                    }}
+                  >
+                    + Add Promo Banner
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
+                    gap: "16px",
+                  }}
+                >
+                  {promoBanners.banners.map((banner, idx) => {
+                    const updateBanner = (patch: Partial<PromoBannerItem>) => {
+                      setPromoBanners((prev) => ({
+                        ...prev,
+                        banners: prev.banners.map((b, i) =>
+                          i === idx ? { ...b, ...patch } : b
+                        ),
+                      }));
+                    };
+
+                    return (
+                      <div
+                        key={banner.id}
+                        style={{
+                          background: "#ffffff",
+                          border: banner.enable_banner
+                            ? "1px solid #cccccc"
+                            : "1px dashed #cccccc",
+                          borderRadius: "12px",
+                          padding: "16px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "12px",
+                          opacity: banner.enable_banner ? 1 : 0.65,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            borderBottom: "1px solid #ebebeb",
+                            paddingBottom: "10px",
+                          }}
+                        >
+                          <label className="polaris-switch">
+                            <input
+                              type="checkbox"
+                              checked={banner.enable_banner}
+                              onChange={(e) =>
+                                updateBanner({ enable_banner: e.target.checked })
+                              }
+                            />
+                            <span className="polaris-switch-track">
+                              <span className="polaris-switch-thumb" />
+                            </span>
+                            <span>
+                              <strong>Banner {idx + 1}:</strong>{" "}
+                              {banner.enable_banner ? "Visible" : "Hidden"}
+                            </span>
+                          </label>
+
+                          <button
+                            type="button"
+                            className="btn-tiny"
+                            style={{ color: "#8e1f0b" }}
+                            onClick={() => {
+                              if (!confirm(`Delete Promo Banner "${banner.heading}"?`)) return;
+                              setPromoBanners((prev) => ({
+                                ...prev,
+                                banners: prev.banners.filter((_, i) => i !== idx),
+                              }));
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+
+                        {/* Live Promo Banner Preview */}
+                        <div
+                          style={{
+                            height: "145px",
+                            borderRadius: "8px",
+                            border: "1px solid #e3e3e3",
+                            backgroundColor: banner.bg_color || "#F0F3F2",
+                            backgroundImage: `url('${
+                              banner.custom_image_url || banner.image_preview_url
+                            }')`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            padding: "20px",
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontWeight: 700,
+                              fontSize: "16px",
+                              color: "#001e2b",
+                              marginBottom: "4px",
+                            }}
+                          >
+                            {banner.heading}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "12.5px",
+                              color: "#5c6c75",
+                              marginBottom: "10px",
+                            }}
+                          >
+                            {banner.subheading}
+                          </div>
+                          {banner.show_button && (
+                            <span
+                              style={{
+                                alignSelf: "flex-start",
+                                background: "#001e2b",
+                                color: "#ffffff",
+                                fontSize: "11.5px",
+                                fontWeight: 600,
+                                padding: "5px 12px",
+                                borderRadius: "6px",
+                              }}
+                            >
+                              {banner.button_text}
+                            </span>
+                          )}
+                        </div>
+
+                        <label
+                          className="btn-action secondary"
+                          style={{
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            width: "100%",
+                          }}
+                        >
+                          {uploadingImageKey === banner.id
+                            ? "Uploading Banner Image..."
+                            : "📷 Upload / Change Banner Image"}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: "none" }}
+                            disabled={uploadingImageKey === banner.id}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) {
+                                handleUploadCmsImage(f, banner.id, (cdnUrl) => {
+                                  updateBanner({
+                                    custom_image_url: cdnUrl,
+                                    image_preview_url: cdnUrl,
+                                  });
+                                });
+                              }
+                            }}
+                          />
+                        </label>
+
+                        <div className="modal-grid-2">
+                          <div className="form-group">
+                            <label>Banner Heading</label>
+                            <input
+                              type="text"
+                              value={banner.heading}
+                              onChange={(e) => updateBanner({ heading: e.target.value })}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label>Offer / Discount Text</label>
+                            <input
+                              type="text"
+                              value={banner.subheading}
+                              onChange={(e) => updateBanner({ subheading: e.target.value })}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="modal-grid-2">
+                          <div className="form-group">
+                            <div className="form-label-row">
+                              <label>Button Text</label>
+                              <label style={{ fontSize: "11.5px", fontWeight: 500 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={banner.show_button}
+                                  onChange={(e) =>
+                                    updateBanner({ show_button: e.target.checked })
+                                  }
+                                />{" "}
+                                Show
+                              </label>
+                            </div>
+                            <input
+                              type="text"
+                              value={banner.button_text}
+                              onChange={(e) => updateBanner({ button_text: e.target.value })}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label>Button Link URL</label>
+                            <input
+                              type="text"
+                              value={banner.button_url}
+                              onChange={(e) => updateBanner({ button_url: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ==============================================================
+                CMS SUB-TAB 4: POPULAR PRODUCTS SETTINGS
+               ============================================================== */}
+            {storefrontSubTab === "products" && (
+              <div
+                style={{
+                  background: "#ffffff",
+                  border: "1px solid #cccccc",
+                  borderRadius: "12px",
+                  padding: "20px",
+                  maxWidth: "560px",
+                }}
+              >
+                <h3 style={{ margin: "0 0 12px", fontSize: "15px", fontWeight: 650 }}>
+                  Homepage Popular Products Section
+                </h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                  <label className="polaris-switch">
+                    <input
+                      type="checkbox"
+                      checked={popularProducts.show_section}
+                      onChange={(e) =>
+                        setPopularProducts((prev) => ({
+                          ...prev,
+                          show_section: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span className="polaris-switch-track">
+                      <span className="polaris-switch-thumb" />
+                    </span>
+                    <span>Show Popular Products Section on Homepage</span>
+                  </label>
+
+                  <div className="form-group">
+                    <label>Section Heading</label>
+                    <input
+                      type="text"
+                      value={popularProducts.heading}
+                      onChange={(e) =>
+                        setPopularProducts((prev) => ({ ...prev, heading: e.target.value }))
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Number of Products to Display (4 – 20)</label>
+                    <input
+                      type="number"
+                      min={4}
+                      max={20}
+                      value={popularProducts.products_limit}
+                      onChange={(e) =>
+                        setPopularProducts((prev) => ({
+                          ...prev,
+                          products_limit: Number(e.target.value) || 10,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                    <input
+                      type="checkbox"
+                      checked={popularProducts.show_badges}
+                      onChange={(e) =>
+                        setPopularProducts((prev) => ({
+                          ...prev,
+                          show_badges: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span>Show &quot;Sale&quot; badges on discounted items</span>
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Modal: Add Delivery Area */}
@@ -2404,6 +4132,7 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       )}
-    </main>
+      </main>
+    </div>
   );
 }
