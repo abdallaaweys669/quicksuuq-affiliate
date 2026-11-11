@@ -1032,19 +1032,6 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="polaris-admin-shell">
-      {/* Shopify App Bridge Navigation Menu (renders below QuickSuuq Affiliate in Shopify's black left sidebar) */}
-      {/* @ts-expect-error Shopify App Bridge custom web component */}
-      <ui-nav-menu>
-        <a href="/admin?tab=commissions" rel="home">
-          Commissions
-        </a>
-        <a href="/admin?tab=salespeople">Sales Team</a>
-        <a href="/admin?tab=payouts">Payouts &amp; Mobile Money</a>
-        <a href="/admin?tab=delivery">Delivery &amp; Logistics</a>
-        <a href="/admin?tab=storefront">Website Content (CMS)</a>
-        {/* @ts-expect-error Shopify App Bridge custom web component */}
-      </ui-nav-menu>
-
       {/* Left Sidebar Navigation (Menus below QuickSuuq Affiliate) */}
       <aside className="polaris-sidebar">
         <div className="polaris-sidebar-brand">
