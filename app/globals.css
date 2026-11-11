@@ -859,3 +859,193 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ═════════════════════════════════════════════════════════════════════
+   SHOPIFY MOBILE APP RESPONSIVE OPTIMIZATIONS (Play Store App & Small Screens)
+   ═════════════════════════════════════════════════════════════════════ */
+
+/* Mobile vs Desktop View Toggle */
+.desktop-only-view {
+  display: block;
+}
+
+.mobile-only-view {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .desktop-only-view {
+    display: none !important;
+  }
+
+  .mobile-only-view {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .admin-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 10px;
+    padding: 12px 14px !important;
+  }
+
+  .header-actions {
+    width: 100%;
+    justifyContent: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .admin-toolbar {
+    padding: 10px 12px !important;
+  }
+
+  .tabs-header {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    white-space: nowrap;
+    width: 100%;
+    padding-bottom: 4px;
+  }
+
+  .tabs-header::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-btn {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  /* Modal Bottom Sheet on Mobile */
+  .modal-backdrop {
+    padding: 0 !important;
+    align-items: flex-end !important;
+  }
+
+  .modal-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 92vh !important;
+    border-radius: 18px 18px 0 0 !important;
+    padding: 16px 14px !important;
+    margin: 0 !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15) !important;
+  }
+
+  .modal-card input,
+  .modal-card select {
+    font-size: 15px !important; /* Prevents auto-zoom in mobile webview */
+  }
+}
+
+/* Mobile Order Card Component */
+.mobile-order-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.mobile-order-card:active {
+  background: #f8fafc;
+}
+
+.mobile-order-card-top {
+  display: flex;
+  justifyContent: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 8px;
+}
+
+.mobile-order-number {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f766e;
+}
+
+.mobile-order-total {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.mobile-order-customer {
+  display: flex;
+  justifyContent: space-between;
+  align-items: center;
+  font-size: 14px;
+  color: #1e293b;
+}
+
+.mobile-order-location {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.mobile-order-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.mobile-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.mobile-chip.weight {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.mobile-chip.driver {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.mobile-chip.unassigned {
+  background: #f8fafc;
+  color: #94a3b8;
+  border: 1px dashed #cbd5e1;
+}
+
+.mobile-order-action-btn {
+  width: 100%;
+  background: #18181b;
+  color: #ffffff;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.mobile-order-action-btn:active {
+  background: #27272a;
+}
