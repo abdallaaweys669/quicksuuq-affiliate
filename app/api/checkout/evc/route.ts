@@ -287,8 +287,13 @@ export async function POST(request: NextRequest) {
         ? `$${finalDeliveryFee.toFixed(2)} (Category ${areaInfo.category} $${baseDeliveryFee.toFixed(2)} + $${heavyOrderSurcharge.toFixed(2)} Heavy Order Fee)`
         : `$${finalDeliveryFee.toFixed(2)} (Category ${areaInfo.category})`;
 
-    // Keep Additional Details (note_attributes) minimal & clean so Shopify Order page is not cluttered
-    const noteAttributes: Array<{ name: string; value: string }> = [];
+    // Store phone, customer name, and address in note_attributes and metafields
+    // so they are never hidden or redacted by Shopify's Protected Customer Data (PII) restrictions
+    const noteAttributes: Array<{ name: string; value: string }> = [
+      { name: "Phone", value: formattedPhone },
+      { name: "Customer Name", value: customerName },
+      { name: "Delivery Area", value: deliveryArea },
+    ];
     if (detailedAddress) {
       noteAttributes.push({ name: "Detailed Address", value: detailedAddress });
     }
@@ -363,10 +368,22 @@ export async function POST(request: NextRequest) {
         payment_gateway_names: ["EVC Plus / Zaad / Sahal (Mobile Money)"],
         tags: orderTagList.join(", "),
         note: detailedAddress
-          ? `Delivery Address: ${deliveryArea} — ${detailedAddress}`
-          : `Delivery Area: ${deliveryArea}`,
+          ? `Delivery Address: ${deliveryArea} — ${detailedAddress} | Phone: ${formattedPhone}`
+          : `Delivery Area: ${deliveryArea} | Phone: ${formattedPhone}`,
         note_attributes: noteAttributes,
         metafields: [
+          {
+            namespace: "quicksuuq",
+            key: "customer_phone",
+            type: "single_line_text_field",
+            value: formattedPhone,
+          },
+          {
+            namespace: "quicksuuq",
+            key: "customer_name",
+            type: "single_line_text_field",
+            value: customerName,
+          },
           {
             namespace: "quicksuuq",
             key: "assigned_driver",

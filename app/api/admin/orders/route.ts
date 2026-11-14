@@ -118,6 +118,12 @@ export async function GET() {
                 key
                 value
               }
+              customerPhoneMeta: metafield(namespace: "quicksuuq", key: "customer_phone") {
+                value
+              }
+              customerNameMeta: metafield(namespace: "quicksuuq", key: "customer_name") {
+                value
+              }
               deliveryStatusMeta: metafield(namespace: "quicksuuq", key: "delivery_status") {
                 value
               }
@@ -164,13 +170,32 @@ export async function GET() {
       const custName =
         [n.shippingAddress?.firstName, n.shippingAddress?.lastName].filter(Boolean).join(" ") ||
         [n.customer?.firstName, n.customer?.lastName].filter(Boolean).join(" ") ||
+        n.customerNameMeta?.value ||
         attrs["Customer Name"] ||
+        attrs["customer_name"] ||
+        attrs["Name"] ||
         "QuickSuuq Customer";
 
+      // Robust phone fallback: note, metafield, customAttributes, shippingAddress, customer
+      const notePhoneMatch = (n.note || "").match(/(?:\+?252|0)?[67]\d{7,8}/);
+      const notePhone = notePhoneMatch
+        ? notePhoneMatch[0].startsWith("+")
+          ? notePhoneMatch[0]
+          : notePhoneMatch[0].startsWith("252")
+          ? `+${notePhoneMatch[0]}`
+          : `+252${notePhoneMatch[0].replace(/^0/, "")}`
+        : null;
+
       const phone =
+        attrs["Phone"] ||
+        attrs["phone"] ||
+        attrs["Phone Number"] ||
+        attrs["Customer Phone"] ||
+        attrs["customer_phone"] ||
+        n.customerPhoneMeta?.value ||
+        notePhone ||
         n.shippingAddress?.phone ||
         n.customer?.phone ||
-        attrs["Phone"] ||
         "—";
 
       const deliveryArea =
