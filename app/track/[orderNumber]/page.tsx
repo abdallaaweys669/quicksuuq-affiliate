@@ -178,16 +178,18 @@ export default function OrderTrackPage({
             })}
           </div>
 
-          {/* 1-Click Confirm Delivery Button */}
+          {/* 1-Click Confirm Delivery Button (Only shown when Out for Delivery or Delivered) */}
           {order.stage === "DELIVERED" ? (
             <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 18 }}>✓</span>
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#166534" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 10 8 14 16 6" />
+              </svg>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#166534" }}>Order Delivered</div>
                 <div style={{ fontSize: 12, color: "#15803d" }}>Mahadsanid! Delivery confirmed.</div>
               </div>
             </div>
-          ) : (
+          ) : order.stage === "OUT_FOR_DELIVERY" ? (
             <button
               type="button"
               onClick={handleConfirmDelivery}
@@ -202,11 +204,18 @@ export default function OrderTrackPage({
                 fontSize: 14,
                 fontWeight: 600,
                 cursor: confirming ? "wait" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
               }}
             >
-              {confirming ? "Confirming..." : "✓ I Received My Order (Waxaan Helay Dalabkayga)"}
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 10 8 14 16 6" />
+              </svg>
+              <span>{confirming ? "Confirming..." : "I Received My Order (Waxaan Helay Dalabkayga)"}</span>
             </button>
-          )}
+          ) : null}
         </div>
 
         {/* Driver Card (Shown when driver is assigned) */}

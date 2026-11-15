@@ -629,19 +629,26 @@ export default function AdminDashboardPage() {
     return digits;
   }
 
+  function cleanCustomerDistrict(rawArea: string): string {
+    return (rawArea || "Mogadishu")
+      .split("—")[0]
+      .replace(/\(Category\s+[A-Za-z0-9]+\)/gi, "")
+      .trim() || "Mogadishu";
+  }
+
   function getInProcessWhatsAppText(order: DispatchOrder): string {
-    const areaDisplay = order.delivery_area.split("—")[0].trim();
+    const areaDisplay = cleanCustomerDistrict(order.delivery_area);
     const cleanNum = order.order_number.replace(/^#/, "");
 
-    return `Asc ${order.customer_name || "QuickSuuq Customer"}! Dalabkaaga QuickSuuq (${order.order_number}) hadda xarunta QuickSuuq ayaa lagu diyaarinayaa oo lagu baakaynayaa 📦.
+    return `Asc ${order.customer_name || "QuickSuuq Customer"}, dalabkaaga QuickSuuq (${order.order_number}) hadda xarunta QuickSuuq ayaa lagu diyaarinayaa oo lagu baakaynayaa.
 
 Goobta Gaarsiinta: ${areaDisplay}
 Waxaan kuusoo diri doonaa taleefanka darawalka marka uu soo baxo.
 
-La soco dalabkaaga:
-👉 https://quicksuuq.madalhub.me/track/${cleanNum}
+Eeg dalabkaaga:
+https://quicksuuq-test.myshopify.com/pages/track?order=${cleanNum}
 
-Mahadsanid!`;
+Mahadsanid.`;
   }
 
   function getDispatchWhatsAppText(
@@ -652,21 +659,21 @@ Mahadsanid!`;
   ): string {
     const driverDisplay = driverName.trim() || "Darawalka QuickSuuq";
     const phoneDisplay = driverPhone.trim() || "Wuu kula soo xiriirayaa";
-    const areaDisplay = order.delivery_area.split("—")[0].trim();
+    const areaDisplay = cleanCustomerDistrict(order.delivery_area);
     const addressDisplay = order.detailed_address ? ` (${order.detailed_address})` : "";
     const cleanNum = order.order_number.replace(/^#/, "");
 
-    return `Asc ${order.customer_name || "QuickSuuq Customer"}! Dalabkaaga QuickSuuq (${order.order_number}) waa la diyaariyay oo hadda wadada ayuu ku jiraa 🚚.
+    return `Asc ${order.customer_name || "QuickSuuq Customer"}, dalabkaaga QuickSuuq (${order.order_number}) waa la diyaariyay oo hadda wadada ayuu ku jiraa.
 
 Darawalka kuu wada: ${driverDisplay}
 Taleefanka: ${phoneDisplay}
 Gaariga: ${vehicle || "Bajaj"}
 Goobta: ${areaDisplay}${addressDisplay}
 
-La soco dalabkaaga ama xaqiiji markaad hesho:
-👉 https://quicksuuq.madalhub.me/track/${cleanNum}
+Eeg dalabkaaga ama xaqiiji markaad hesho:
+https://quicksuuq-test.myshopify.com/pages/track?order=${cleanNum}
 
-Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaada soo dhowaado. Mahadsanid!`;
+Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaada soo dhowaado. Mahadsanid.`;
   }
 
   function openManageOrder(o: DispatchOrder) {
@@ -4460,7 +4467,10 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                     href={`tel:${selectedOrder.phone}`}
                     style={{
                       flex: 1,
-                      textAlign: "center",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
                       background: "#ffffff",
                       color: "#111827",
                       border: "1px solid #c9cccf",
@@ -4471,15 +4481,21 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                       textDecoration: "none",
                     }}
                   >
-                    📞 Call
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                    </svg>
+                    Call
                   </a>
                   <a
-                    href={`/track/${selectedOrder.order_number.replace(/^#/, "")}`}
+                    href={`https://quicksuuq-test.myshopify.com/pages/track?order=${selectedOrder.order_number.replace(/^#/, "")}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
                       flex: 1,
-                      textAlign: "center",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "4px",
                       background: "#ffffff",
                       color: "#008060",
                       border: "1px solid #c9cccf",
@@ -4490,7 +4506,12 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                       textDecoration: "none",
                     }}
                   >
-                    Track Page ↗
+                    Customer Page
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
                   </a>
                 </div>
               </div>
@@ -4594,46 +4615,56 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                     {savingOrderDispatch ? "Saving..." : "Save Driver"}
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const clean = formatSomaliWhatsAppNumber(selectedOrder.phone);
-                      if (!clean) {
-                        alert("⚠️ Customer phone number is missing on this order.");
-                        return;
-                      }
-                      const isPreparing =
-                        selectedOrder.workflow_stage === "IN_PROCESS" ||
-                        selectedOrder.workflow_stage === "NOT_PREPARED";
+                  {(() => {
+                    const stage = selectedOrder.workflow_stage;
+                    const canSendPreparing = stage === "IN_PROCESS";
+                    const canSendDispatch = stage === "OUT_FOR_DELIVERY" || stage === "DELIVERED";
+                    const isWhatsAppAllowed = canSendPreparing || canSendDispatch;
+                    const buttonLabel = canSendPreparing
+                      ? "3. Send 'Preparing' WhatsApp"
+                      : canSendDispatch
+                      ? "3. Send 'Out for Delivery' WhatsApp"
+                      : "Select Preparing or Out for Delivery to notify customer";
 
-                      if (isPreparing && !ijarDriverName.trim()) {
-                        const text = getInProcessWhatsAppText(selectedOrder);
-                        window.open(`https://wa.me/${clean}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
-                        return;
-                      }
-
-                      if (!ijarDriverName.trim() || !ijarDriverPhone.trim()) {
-                        alert("⚠️ Please enter Driver Name and Driver Phone first.");
-                        return;
-                      }
-
-                      const text = getDispatchWhatsAppText(selectedOrder, ijarDriverName, ijarDriverPhone, ijarVehicle);
-                      window.open(`https://wa.me/${clean}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
-                    }}
-                    style={{
-                      width: "100%",
-                      background: "#008060",
-                      color: "#ffffff",
-                      border: "none",
-                      padding: "9px 14px",
-                      borderRadius: "6px",
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    3. Send WhatsApp Update
-                  </button>
+                    return (
+                      <button
+                        type="button"
+                        disabled={!isWhatsAppAllowed}
+                        onClick={() => {
+                          if (!isWhatsAppAllowed) return;
+                          const clean = formatSomaliWhatsAppNumber(selectedOrder.phone);
+                          if (!clean) {
+                            alert("Customer phone number is missing on this order.");
+                            return;
+                          }
+                          if (canSendPreparing) {
+                            const text = getInProcessWhatsAppText(selectedOrder);
+                            window.open(`https://wa.me/${clean}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+                            return;
+                          }
+                          if (!ijarDriverName.trim() || !ijarDriverPhone.trim()) {
+                            alert("Please enter Driver Name and Driver Phone first.");
+                            return;
+                          }
+                          const text = getDispatchWhatsAppText(selectedOrder, ijarDriverName, ijarDriverPhone, ijarVehicle);
+                          window.open(`https://wa.me/${clean}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+                        }}
+                        style={{
+                          width: "100%",
+                          background: isWhatsAppAllowed ? "#008060" : "#f1f2f3",
+                          color: isWhatsAppAllowed ? "#ffffff" : "#6d7175",
+                          border: isWhatsAppAllowed ? "none" : "1px solid #d2d5d8",
+                          padding: "9px 14px",
+                          borderRadius: "6px",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          cursor: isWhatsAppAllowed ? "pointer" : "not-allowed",
+                        }}
+                      >
+                        {buttonLabel}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

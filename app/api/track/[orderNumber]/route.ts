@@ -7,6 +7,23 @@ export const revalidate = 0;
 const SHOPIFY_STORE = process.env.SHOPIFY_STORE_DOMAIN || "quicksuuq-test.myshopify.com";
 const SHOPIFY_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || "";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders });
+}
+
+function cleanDistrictName(rawArea: string): string {
+  return (rawArea || "Mogadishu")
+    .split("—")[0]
+    .replace(/\(Category\s+[A-Za-z0-9]+\)/gi, "")
+    .trim() || "Mogadishu";
+}
+
 async function shopifyGql(query: string, variables: Record<string, unknown> = {}) {
   const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2025-01/graphql.json`, {
     method: "POST",
@@ -160,7 +177,7 @@ export async function GET(
         total: `$${Number(n.totalPriceSet?.shopMoney?.amount || 0).toFixed(2)}`,
         stage,
         delivery_status: deliveryStatus || "Processing",
-        delivery_area: n.deliveryAreaMeta?.value || attrs["Delivery Area"] || "Mogadishu",
+        delivery_area: cleanDistrictName(n.deliveryAreaMeta?.value || attrs["Delivery Area"] || "Mogadishu"),
         detailed_address: attrs["Detailed Address"] || "",
         driver_name: driverName,
         driver_phone: driverPhone,
@@ -170,6 +187,7 @@ export async function GET(
       },
     }, {
       headers: {
+        ...corsHeaders,
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
         "Pragma": "no-cache",
         "Expires": "0",
@@ -177,7 +195,7 @@ export async function GET(
     });
   } catch (error) {
     console.error("Error fetching order tracking info:", error);
-    return NextResponse.json({ error: "Failed to fetch order tracking info" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch order tracking info" }, { status: 500, headers: corsHeaders });
   }
 }
 
@@ -254,9 +272,9 @@ export async function POST(
       success: true,
       message: "Mahadsanid! Dalabkaaga waxaa loo xaqiijiyay in lagu soo gaarsiiyay.",
       stage: "DELIVERED",
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error("Error confirming order delivery:", error);
-    return NextResponse.json({ error: "Failed to confirm delivery" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to confirm delivery" }, { status: 500, headers: corsHeaders });
   }
 }
