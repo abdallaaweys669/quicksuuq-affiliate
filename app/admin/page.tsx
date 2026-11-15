@@ -4348,48 +4348,64 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
         </div>
       )}
 
-      {/* Modal: Clean 1-Screen Order Details & Dispatch Manager */}
+      {/* Modal: Simple Shopify-Style Order Manager */}
       {selectedOrder && (
         <div className="modal-backdrop" onClick={() => setSelectedOrder(null)}>
           <div
             className="modal-card"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: "740px", width: "96%", maxHeight: "90vh", overflowY: "auto", padding: "22px" }}
+            style={{
+              maxWidth: "740px",
+              width: "96%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              padding: "24px",
+              background: "#f6f6f7",
+              borderRadius: "12px",
+            }}
           >
             {/* Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e2e8f0", paddingBottom: "12px", marginBottom: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: "20px", fontWeight: 800, color: "#0f172a" }}>
+                <h3 style={{ margin: 0, fontSize: "20px", fontWeight: 700, color: "#111827" }}>
                   Order {selectedOrder.order_number}
                 </h3>
-                <span style={{ fontSize: "12px", color: "#64748b" }}>
+                <span style={{ fontSize: "12px", color: "#6d7175" }}>
                   {new Date(selectedOrder.created_at).toLocaleString()} · Total: <strong>${selectedOrder.total_usd.toFixed(2)}</strong>
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedOrder(null)}
-                className="btn-secondary"
-                style={{ padding: "6px 14px", fontSize: "13px" }}
+                style={{
+                  background: "#ffffff",
+                  border: "1px solid #c9cccf",
+                  color: "#202223",
+                  padding: "6px 12px",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
               >
                 ✕ Close
               </button>
             </div>
 
-            {/* 5-Stage Progress Switcher (1-Click) */}
-            <div style={{ marginBottom: "18px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 700, color: "#475569", marginBottom: "8px", textTransform: "uppercase" }}>
-                1-Click Order Status (Marxaladda Dalabka)
+            {/* Step 1: Order Status */}
+            <div style={{ background: "#ffffff", border: "1px solid #e1e3e5", borderRadius: "10px", padding: "16px", marginBottom: "14px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 600, color: "#6d7175", marginBottom: "10px" }}>
+                1. Order Status
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(125px, 1fr))", gap: "8px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(115px, 1fr))", gap: "8px" }}>
                 {(
                   [
-                    { key: "UNPAID", label: "1. Unpaid", sub: "Lacag La'aan" },
-                    { key: "NOT_PREPARED", label: "2. Not Prepared", sub: "Aan La Diyaarin" },
-                    { key: "IN_PROCESS", label: "3. In Process", sub: "Diyaarin" },
-                    { key: "OUT_FOR_DELIVERY", label: "4. Out for Delivery", sub: "Wadada" },
-                    { key: "DELIVERED", label: "5. Delivered", sub: "La Gaarsiiyay" },
-                  ] as Array<{ key: OrderWorkflowStage; label: string; sub: string }>
+                    { key: "UNPAID", label: "1. Unpaid" },
+                    { key: "NOT_PREPARED", label: "2. Paid" },
+                    { key: "IN_PROCESS", label: "3. Preparing" },
+                    { key: "OUT_FOR_DELIVERY", label: "4. Out for Delivery" },
+                    { key: "DELIVERED", label: "5. Delivered" },
+                  ] as Array<{ key: OrderWorkflowStage; label: string }>
                 ).map((st) => {
                   const active = selectedOrder.workflow_stage === st.key;
                   return (
@@ -4401,251 +4417,124 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                       style={{
                         padding: "9px 10px",
                         borderRadius: "8px",
-                        border: active ? "2px solid #0d9488" : "1px solid #cbd5e1",
-                        background: active ? "#f0fdfa" : "#fff",
-                        color: active ? "#0f766e" : "#334155",
+                        border: active ? "2px solid #111827" : "1px solid #d1d5db",
+                        background: active ? "#111827" : "#ffffff",
+                        color: active ? "#ffffff" : "#374151",
+                        fontSize: "12px",
+                        fontWeight: 600,
                         cursor: "pointer",
-                        textAlign: "left",
+                        textAlign: "center",
                       }}
                     >
-                      <div style={{ fontSize: "12px", fontWeight: 700 }}>{st.label}</div>
-                      <div style={{ fontSize: "11px", color: "#64748b" }}>{st.sub}</div>
+                      {st.label}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* 2 Clean Side-by-Side Cards: Customer/Address + Ijaar Driver & Customer Notification */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-                gap: "14px",
-                marginBottom: "18px",
-              }}
-            >
-              {/* Card 1: Customer & Address */}
-              <div
-                style={{
-                  background: "#f8fafc",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "10px",
-                  padding: "16px",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "space-between",
-                }}
-              >
+            {/* Step 2: Customer & Driver Cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "14px", marginBottom: "14px" }}>
+              {/* Customer Card */}
+              <div style={{ background: "#ffffff", border: "1px solid #e1e3e5", borderRadius: "10px", padding: "16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                 <div>
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 700,
-                      color: "#0f766e",
-                      textTransform: "uppercase",
-                      marginBottom: "12px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span>👤 Customer &amp; Delivery Destination</span>
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        color: "#0284c7",
-                        background: "#e0f2fe",
-                        padding: "2px 7px",
-                        borderRadius: "999px",
-                      }}
-                    >
-                      Shopify Synced
-                    </span>
+                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#6d7175", marginBottom: "10px" }}>
+                    Customer Details
                   </div>
-
-                  <div style={{ fontSize: "15px", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>
+                  <div style={{ fontSize: "15px", fontWeight: 700, color: "#111827", marginBottom: "4px" }}>
                     {selectedOrder.customer_name}
                   </div>
+                  <div style={{ fontSize: "13px", color: "#374151", marginBottom: "10px" }}>
+                    Phone: <strong>{selectedOrder.phone}</strong>
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#374151", marginBottom: "4px" }}>
+                    Area: <strong>{selectedOrder.delivery_area.split("—")[0].trim()}</strong>
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "14px" }}>
+                    Address: {selectedOrder.detailed_address || "Mogadishu"}
+                  </div>
+                </div>
 
-                  <div style={{ fontSize: "14px", color: "#475569", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <strong>Phone:</strong> {selectedOrder.phone}
-                  </div>
-
-                  {/* 1-Click WhatsApp & Call Customer Shortcuts */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
-                    {formatSomaliWhatsAppNumber(selectedOrder.phone) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const clean = formatSomaliWhatsAppNumber(selectedOrder.phone);
-                          const text = getInProcessWhatsAppText(selectedOrder);
-                          window.open(`https://wa.me/${clean}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
-                        }}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "5px",
-                          background: "#0284c7",
-                          color: "#ffffff",
-                          border: "none",
-                          padding: "6px 12px",
-                          borderRadius: "6px",
-                          fontSize: "12px",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                        }}
-                      >
-                        📦 WhatsApp "In Process" Alert
-                      </button>
-                    )}
-                    <a
-                      href={`tel:${selectedOrder.phone}`}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "5px",
-                        background: "#ffffff",
-                        color: "#0f172a",
-                        border: "1px solid #cbd5e1",
-                        padding: "6px 12px",
-                        borderRadius: "6px",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        textDecoration: "none",
-                      }}
-                    >
-                      📞 Call Customer
-                    </a>
-                  </div>
-
-                  {/* Customer Tracking Link Preview */}
-                  <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 10px", marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                    <div style={{ fontSize: "11px", color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      <strong style={{ color: "#0f172a" }}>Customer Tracking:</strong> {`https://quicksuuq.madalhub.me/track/${selectedOrder.order_number.replace(/^#/, "")}`}
-                    </div>
-                    <a
-                      href={`/track/${selectedOrder.order_number.replace(/^#/, "")}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        color: "#0f766e",
-                        background: "#f0fdfa",
-                        border: "1px solid #99f6e4",
-                        padding: "3px 8px",
-                        borderRadius: "5px",
-                        textDecoration: "none",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      ↗ Open Page
-                    </a>
-                  </div>
-
-                  <div style={{ fontSize: "13px", color: "#334155", marginBottom: "6px", borderTop: "1px solid #e2e8f0", paddingTop: "10px" }}>
-                    <strong>Delivery Area:</strong> {selectedOrder.delivery_area}
-                  </div>
-                  <div style={{ fontSize: "13px", color: "#334155" }}>
-                    <strong>Detailed Address:</strong> {selectedOrder.detailed_address || "Mogadishu"}
-                  </div>
+                <div style={{ display: "flex", gap: "8px", borderTop: "1px solid #f1f2f3", paddingTop: "12px" }}>
+                  <a
+                    href={`tel:${selectedOrder.phone}`}
+                    style={{
+                      flex: 1,
+                      textAlign: "center",
+                      background: "#ffffff",
+                      color: "#111827",
+                      border: "1px solid #c9cccf",
+                      padding: "7px 10px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                    }}
+                  >
+                    📞 Call
+                  </a>
+                  <a
+                    href={`/track/${selectedOrder.order_number.replace(/^#/, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      flex: 1,
+                      textAlign: "center",
+                      background: "#ffffff",
+                      color: "#008060",
+                      border: "1px solid #c9cccf",
+                      padding: "7px 10px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                    }}
+                  >
+                    Track Page ↗
+                  </a>
                 </div>
               </div>
 
-              {/* Card 2: Darawal Ijaar (Freelance / Hired Driver Dispatch) */}
-              <div
-                style={{
-                  background: "#f0fdf4",
-                  border: "1px solid #bbf7d0",
-                  borderRadius: "10px",
-                  padding: "16px",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    color: "#15803d",
-                    textTransform: "uppercase",
-                    marginBottom: "10px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span>🚚 Darawal Ijaar (Hired Delivery Driver)</span>
-                  <span style={{ fontSize: "11px", fontWeight: 600, color: "#166534", background: "#dcfce7", padding: "2px 8px", borderRadius: "999px" }}>
-                    On-Demand Dispatch
+              {/* Driver & WhatsApp Card */}
+              <div style={{ background: "#ffffff", border: "1px solid #e1e3e5", borderRadius: "10px", padding: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <span style={{ fontSize: "12px", fontWeight: 600, color: "#6d7175" }}>2. Assign Driver</span>
+                  <span style={{ fontSize: "11px", color: "#6d7175", background: "#f6f6f7", padding: "2px 8px", borderRadius: "99px" }}>
+                    {selectedOrder.order_weight.split("(")[0].trim()} · {selectedOrder.recommended_vehicle.split("(")[0].trim()}
                   </span>
                 </div>
 
-                {/* Weight & Recommended Vehicle notice */}
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: "12px",
-                    background: "#ffffff",
-                    border: "1px solid #86efac",
-                    padding: "8px 10px",
-                    borderRadius: "6px",
-                    marginBottom: "12px",
-                    color: "#166534",
-                  }}
-                >
-                  <span>⚖️ Miisaanka: <strong>{selectedOrder.order_weight.split("(")[0].trim()}</strong></span>
-                  <span>🚗 Gaariga: <strong>{selectedOrder.recommended_vehicle.split("(")[0].trim()}</strong></span>
-                </div>
-
-                {/* Ijaar Driver Form */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "10px" }}>
                   <div>
-                    <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>
-                      Magaca Darawalka Ijaarka:
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#374151", marginBottom: "4px" }}>
+                      Driver Name
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Cabdi Cali"
+                      placeholder="e.g. Ahmed Ali"
                       value={ijarDriverName}
                       onChange={(e) => setIjarDriverName(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "7px 10px",
-                        borderRadius: "6px",
-                        border: "1px solid #cbd5e1",
-                        fontSize: "13px",
-                        background: "#fff",
-                      }}
+                      style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #c9cccf", fontSize: "13px", boxSizing: "border-box" }}
                     />
                   </div>
                   <div>
-                    <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>
-                      Taleefanka Darawalka:
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#374151", marginBottom: "4px" }}>
+                      Driver Phone
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. 0615123456"
+                      placeholder="e.g. 0615001122"
                       value={ijarDriverPhone}
                       onChange={(e) => setIjarDriverPhone(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "7px 10px",
-                        borderRadius: "6px",
-                        border: "1px solid #cbd5e1",
-                        fontSize: "13px",
-                        background: "#fff",
-                      }}
+                      style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #c9cccf", fontSize: "13px", boxSizing: "border-box" }}
                     />
                   </div>
                 </div>
 
-                {/* Vehicle Selection Chips & Fare */}
-                <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "12px" }}>
-                  <div style={{ flex: "1 1 auto" }}>
-                    <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>
-                      Nooca Gaariga:
+                <div style={{ display: "flex", gap: "8px", alignItems: "flex-end", marginBottom: "14px" }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#374151", marginBottom: "4px" }}>
+                      Vehicle
                     </label>
                     <div style={{ display: "flex", gap: "6px" }}>
                       {(["Bajaj", "Mooto", "Gaari"] as const).map((v) => (
@@ -4655,160 +4544,112 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                           onClick={() => setIjarVehicle(v)}
                           style={{
                             flex: 1,
-                            padding: "5px 6px",
+                            padding: "6px",
                             fontSize: "12px",
-                            fontWeight: 700,
+                            fontWeight: 600,
                             borderRadius: "6px",
-                            border: ijarVehicle === v ? "2px solid #16a34a" : "1px solid #cbd5e1",
-                            background: ijarVehicle === v ? "#dcfce7" : "#ffffff",
-                            color: ijarVehicle === v ? "#15803d" : "#475569",
+                            border: ijarVehicle === v ? "2px solid #111827" : "1px solid #c9cccf",
+                            background: ijarVehicle === v ? "#f6f6f7" : "#ffffff",
+                            color: "#111827",
                             cursor: "pointer",
                           }}
                         >
-                          {v === "Bajaj" ? "🛺 Bajaj" : v === "Mooto" ? "🛵 Mooto" : "🚐 Gaari"}
+                          {v === "Bajaj" ? "Bajaj" : v === "Mooto" ? "Motorbike" : "Mini-Truck"}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <div style={{ width: "95px" }}>
-                    <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#334155", marginBottom: "4px" }}>
-                      Kirada ($):
+                  <div style={{ width: "80px" }}>
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#374151", marginBottom: "4px" }}>
+                      Fare ($)
                     </label>
                     <input
                       type="number"
                       step="0.25"
                       value={ijarFareUsd}
                       onChange={(e) => setIjarFareUsd(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "6px 8px",
-                        borderRadius: "6px",
-                        border: "1px solid #cbd5e1",
-                        fontSize: "12px",
-                        background: "#fff",
-                      }}
+                      style={{ width: "100%", padding: "6px 8px", borderRadius: "6px", border: "1px solid #c9cccf", fontSize: "12px", boxSizing: "border-box" }}
                     />
                   </div>
                 </div>
 
-                {/* Dispatch & Customer Notification Actions */}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                {/* 2 Clean Action Buttons: Save + Smart WhatsApp */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <button
                     type="button"
                     onClick={handleSaveIjarDriver}
                     disabled={savingOrderDispatch}
                     style={{
-                      flex: "1 1 140px",
-                      background: "#0f766e",
+                      width: "100%",
+                      background: "#111827",
                       color: "#ffffff",
                       border: "none",
-                      padding: "8px 12px",
+                      padding: "9px 14px",
                       borderRadius: "6px",
-                      fontSize: "12px",
-                      fontWeight: 700,
+                      fontSize: "13px",
+                      fontWeight: 600,
                       cursor: "pointer",
                     }}
                   >
-                    {savingOrderDispatch ? "Saving..." : "💾 Save Driver & Sync Shopify"}
+                    {savingOrderDispatch ? "Saving..." : "Save Driver"}
                   </button>
+
                   <button
                     type="button"
                     onClick={() => {
-                      if (!ijarDriverName.trim()) {
-                        alert("⚠️ Please enter the Driver's Name before sending the WhatsApp message to the customer.");
-                        return;
-                      }
-                      if (!ijarDriverPhone.trim() || ijarDriverPhone.trim().length < 6) {
-                        alert("⚠️ Please enter a valid Driver Phone Number before sending the WhatsApp message to the customer.");
-                        return;
-                      }
                       const clean = formatSomaliWhatsAppNumber(selectedOrder.phone);
                       if (!clean) {
-                        alert("⚠️ Customer phone number is missing or invalid on this order.");
+                        alert("⚠️ Customer phone number is missing on this order.");
                         return;
                       }
+                      const isPreparing =
+                        selectedOrder.workflow_stage === "IN_PROCESS" ||
+                        selectedOrder.workflow_stage === "NOT_PREPARED";
+
+                      if (isPreparing && !ijarDriverName.trim()) {
+                        const text = getInProcessWhatsAppText(selectedOrder);
+                        window.open(`https://wa.me/${clean}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+                        return;
+                      }
+
+                      if (!ijarDriverName.trim() || !ijarDriverPhone.trim()) {
+                        alert("⚠️ Please enter Driver Name and Driver Phone first.");
+                        return;
+                      }
+
                       const text = getDispatchWhatsAppText(selectedOrder, ijarDriverName, ijarDriverPhone, ijarVehicle);
                       window.open(`https://wa.me/${clean}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
                     }}
                     style={{
-                      flex: "1 1 180px",
-                      background: ijarDriverName.trim() && ijarDriverPhone.trim() ? "#16a34a" : "#94a3b8",
+                      width: "100%",
+                      background: "#008060",
                       color: "#ffffff",
                       border: "none",
-                      padding: "10px 14px",
+                      padding: "9px 14px",
                       borderRadius: "6px",
-                      fontSize: "12px",
-                      fontWeight: 700,
-                      cursor: ijarDriverName.trim() && ijarDriverPhone.trim() ? "pointer" : "not-allowed",
-                      whiteSpace: "nowrap",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "6px",
-                      boxShadow: ijarDriverName.trim() && ijarDriverPhone.trim() ? "0 2px 4px rgba(22, 163, 74, 0.25)" : "none",
-                    }}
-                  >
-                    📲 Send WhatsApp to Customer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!ijarDriverName.trim() || !ijarDriverPhone.trim()) {
-                        alert("⚠️ Please enter both Driver Name and Driver Phone Number before copying the customer message.");
-                        return;
-                      }
-                      const text = getDispatchWhatsAppText(selectedOrder, ijarDriverName, ijarDriverPhone, ijarVehicle);
-                      navigator.clipboard.writeText(text);
-                      setCopiedSms(true);
-                      showFeedback("✓ Message copied to clipboard!");
-                      setTimeout(() => setCopiedSms(false), 3000);
-                    }}
-                    style={{
-                      flex: "1 1 auto",
-                      background: "#ffffff",
-                      color: "#334155",
-                      border: "1px solid #cbd5e1",
-                      padding: "10px 12px",
-                      borderRadius: "6px",
-                      fontSize: "12px",
+                      fontSize: "13px",
                       fontWeight: 600,
                       cursor: "pointer",
-                      whiteSpace: "nowrap",
                     }}
                   >
-                    {copiedSms ? "✓ Copied!" : "📋 Copy Message (SMS)"}
+                    3. Send WhatsApp Update
                   </button>
-
-                  {/* Clear Driver Validation Hint */}
-                  <div
-                    style={{
-                      width: "100%",
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      color: ijarDriverName.trim() && ijarDriverPhone.trim() ? "#15803d" : "#b91c1c",
-                      marginTop: "2px",
-                    }}
-                  >
-                    {ijarDriverName.trim() && ijarDriverPhone.trim()
-                      ? "✓ Driver Name and Phone are entered. Ready to send WhatsApp."
-                      : "⚠️ Driver Name and Phone Number are required before sending WhatsApp to the customer."}
-                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Clean Ordered Items Table */}
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: "10px", overflow: "hidden" }}>
-              <div style={{ background: "#f8fafc", padding: "10px 14px", fontSize: "12px", fontWeight: 700, color: "#475569", borderBottom: "1px solid #e2e8f0" }}>
-                🛒 Ordered Items ({selectedOrder.items.reduce((s, i) => s + i.quantity, 0)} items)
+            {/* Ordered Items */}
+            <div style={{ background: "#ffffff", border: "1px solid #e1e3e5", borderRadius: "10px", overflow: "hidden" }}>
+              <div style={{ padding: "10px 16px", fontSize: "12px", fontWeight: 600, color: "#6d7175", borderBottom: "1px solid #e1e3e5" }}>
+                Ordered Items ({selectedOrder.items.reduce((s, i) => s + i.quantity, 0)})
               </div>
               <table className="data-table" style={{ margin: 0 }}>
                 <thead>
                   <tr>
                     <th>Product</th>
                     <th>Qty</th>
-                    <th>Unit Price</th>
-                    <th>Line Total</th>
+                    <th>Price</th>
+                    <th>Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4822,11 +4663,11 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                   ))}
                 </tbody>
               </table>
-              <div style={{ background: "#f8fafc", padding: "12px 16px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "14px" }}>
-                <span>
+              <div style={{ padding: "12px 16px", borderTop: "1px solid #e1e3e5", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
+                <span style={{ color: "#6d7175" }}>
                   Subtotal: <strong>${selectedOrder.subtotal_usd.toFixed(2)}</strong> · Delivery: <strong>${selectedOrder.shipping_usd.toFixed(2)}</strong>
                 </span>
-                <span style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a" }}>
+                <span style={{ fontSize: "15px", fontWeight: 700, color: "#111827" }}>
                   Total: ${selectedOrder.total_usd.toFixed(2)}
                 </span>
               </div>
