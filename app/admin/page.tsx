@@ -254,7 +254,7 @@ export default function AdminDashboardPage() {
   // WhatsApp Broadcast & Marketing State
   const [waNumbersInput, setWaNumbersInput] = useState("");
   const [waMessageText, setWaMessageText] = useState(
-    "Asc Macaamiil! Ku soo dhowow QuickSuuq — Dalbo Khudaarta, Raashinka, iyo Qalabka Guriga oo laguugu keeno meelkasta oo Mogadishu ah 🚚💨.\n\n👉 Booqo dukaanka: https://quicksuuq-test.myshopify.com\n\nMahadsanid!"
+    "Asc Macaamiil! Ku soo dhowow QuickSuuq - Dalbo Khudaarta, Raashinka, iyo Qalabka Guriga oo laguugu keeno meelkasta oo Mogadishu ah.\n\nBooqo dukaanka: https://quicksuuq-test.myshopify.com\n\nMahadsanid!"
   );
   const [waParsedNumbers, setWaParsedNumbers] = useState<string[]>([]);
   const [waCurrentIndex, setWaCurrentIndex] = useState(0);
@@ -1394,49 +1394,54 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
         {/* Top Horizontal Tabs + Context Toolbar */}
         <section className="content-card">
           <div className="admin-toolbar">
-            <div className="tabs-header">
-              <button
-                className={`tab-btn ${activeTab === "orders" ? "active" : ""}`}
-                onClick={() => setActiveTab("orders")}
-              >
-                📦 Orders &amp; Dispatch ({ordersList.length})
-              </button>
-              <button
-                className={`tab-btn ${activeTab === "commissions" ? "active" : ""}`}
-                onClick={() => setActiveTab("commissions")}
-              >
-                Commissions ({commissions.length})
-              </button>
-              <button
-                className={`tab-btn ${activeTab === "salespeople" ? "active" : ""}`}
-                onClick={() => setActiveTab("salespeople")}
-              >
-                Sales Team ({salespeople.length})
-              </button>
-              <button
-                className={`tab-btn ${activeTab === "payouts" ? "active" : ""}`}
-                onClick={() => setActiveTab("payouts")}
-              >
-                Payouts &amp; Mobile Money ({payouts.length})
-              </button>
-              <button
-                className={`tab-btn ${activeTab === "delivery" ? "active" : ""}`}
-                onClick={() => setActiveTab("delivery")}
-              >
-                🚚 Delivery &amp; Logistics ({deliveryAreas.length})
-              </button>
-              <button
-                className={`tab-btn ${activeTab === "storefront" ? "active" : ""}`}
-                onClick={() => setActiveTab("storefront")}
-              >
-                🎨 Website Content (CMS)
-              </button>
-              <button
-                className={`tab-btn ${activeTab === "whatsapp" ? "active" : ""}`}
-                onClick={() => setActiveTab("whatsapp")}
-              >
-                💬 WhatsApp Marketing ({waParsedNumbers.length > 0 ? waParsedNumbers.length : "1,500+"})
-              </button>
+            <div
+              className="tabs-header"
+              style={{
+                display: "flex",
+                flexWrap: "nowrap",
+                alignItems: "center",
+                gap: "4px",
+                overflowX: "auto",
+                borderBottom: "1px solid #e1e3e5",
+                paddingBottom: "8px",
+                marginBottom: "4px",
+                scrollbarWidth: "none",
+              }}
+            >
+              {(
+                [
+                  { id: "orders", label: `Orders (${ordersList.length})` },
+                  { id: "commissions", label: `Commissions (${commissions.length})` },
+                  { id: "salespeople", label: `Sales Team (${salespeople.length})` },
+                  { id: "payouts", label: `Payouts (${payouts.length})` },
+                  { id: "delivery", label: `Delivery (${deliveryAreas.length})` },
+                  { id: "storefront", label: "Storefront" },
+                  { id: "whatsapp", label: `WhatsApp (${waParsedNumbers.length > 0 ? waParsedNumbers.length : "1,500+"})` },
+                ] as const
+              ).map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    style={{
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                      padding: "7px 12px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: isActive ? "#111827" : "transparent",
+                      color: isActive ? "#ffffff" : "#4b5563",
+                      fontSize: "13px",
+                      fontWeight: isActive ? 600 : 500,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="toolbar-actions">
@@ -3682,67 +3687,73 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
         {/* 6. WhatsApp Marketing & 1,500 Bulk Broadcast Tab */}
         {activeTab === "whatsapp" && (
           <div className="tab-pane active" style={{ padding: "0 0 24px" }}>
-            {/* Top Metric Cards */}
-            <div className="metrics-grid admin-metrics" style={{ marginBottom: "20px" }}>
-              <div className="metric-card">
-                <span className="metric-label">Imported Contacts</span>
-                <div className="metric-value teal">{waParsedNumbers.length}</div>
-                <span className="metric-sub">Cleaned Somali numbers ready</span>
+            {/* Top Summary Strip */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "12px", marginBottom: "16px" }}>
+              <div style={{ background: "#ffffff", border: "1px solid #e1e3e5", borderRadius: "10px", padding: "14px 16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: 500, color: "#6d7175", marginBottom: "4px" }}>Imported Contacts</div>
+                <div style={{ fontSize: "22px", fontWeight: 700, color: "#202223" }}>{waParsedNumbers.length}</div>
+                <div style={{ fontSize: "11px", color: "#8c9196", marginTop: "2px" }}>Cleaned Somali numbers</div>
               </div>
-              <div className="metric-card">
-                <span className="metric-label">Dispatched Messages</span>
-                <div className="metric-value" style={{ color: "#16a34a" }}>
+              <div style={{ background: "#ffffff", border: "1px solid #e1e3e5", borderRadius: "10px", padding: "14px 16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: 500, color: "#6d7175", marginBottom: "4px" }}>Sent Messages</div>
+                <div style={{ fontSize: "22px", fontWeight: 700, color: "#008060" }}>
                   {waSentNumbers.length} / {waParsedNumbers.length}
                 </div>
-                <span className="metric-sub">
+                <div style={{ fontSize: "11px", color: "#8c9196", marginTop: "2px" }}>
                   {waParsedNumbers.length > 0
                     ? `${Math.round((waSentNumbers.length / waParsedNumbers.length) * 100)}% completed`
                     : "0% completed"}
-                </span>
-              </div>
-              <div className="metric-card">
-                <span className="metric-label">Queue Delay (Anti-Ban)</span>
-                <div className="metric-value">{waDelaySeconds}s</div>
-                <span className="metric-sub">Safe interval between sends</span>
-              </div>
-              <div className="metric-card">
-                <span className="metric-label">Queue Status</span>
-                <div className="metric-value" style={{ color: waIsRunning ? "#16a34a" : "#64748b" }}>
-                  {waIsRunning ? "● Broadcasting..." : waCurrentIndex > 0 ? "⏸ Paused" : "Ready"}
                 </div>
-                <span className="metric-sub">Current index: #{waCurrentIndex + 1}</span>
+              </div>
+              <div style={{ background: "#ffffff", border: "1px solid #e1e3e5", borderRadius: "10px", padding: "14px 16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: 500, color: "#6d7175", marginBottom: "4px" }}>Send Interval</div>
+                <div style={{ fontSize: "22px", fontWeight: 700, color: "#202223" }}>{waDelaySeconds}s</div>
+                <div style={{ fontSize: "11px", color: "#8c9196", marginTop: "2px" }}>Delay between sends</div>
+              </div>
+              <div style={{ background: "#ffffff", border: "1px solid #e1e3e5", borderRadius: "10px", padding: "14px 16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: 500, color: "#6d7175", marginBottom: "4px" }}>Queue Status</div>
+                <div style={{ fontSize: "18px", fontWeight: 700, color: waIsRunning ? "#008060" : "#202223", marginTop: "2px" }}>
+                  {waIsRunning ? "Sending..." : waCurrentIndex > 0 ? "Paused" : "Ready"}
+                </div>
+                <div style={{ fontSize: "11px", color: "#8c9196", marginTop: "4px" }}>Next contact: #{waCurrentIndex + 1}</div>
               </div>
             </div>
 
             {/* Main Broadcast Grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: "24px", alignItems: "start" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "16px", alignItems: "start" }}>
               {/* Left Column: Number Importer */}
-              <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <div style={{ background: "#ffffff", border: "1px solid #e1e3e5", borderRadius: "12px", padding: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "14px" }}>
                   <div>
-                    <h3 style={{ fontSize: "16px", fontWeight: 700, margin: 0, color: "#0f172a" }}>
-                      1. Import WhatsApp Numbers (1,500+)
+                    <h3 style={{ fontSize: "15px", fontWeight: 600, margin: 0, color: "#202223" }}>
+                      1. Customer Numbers (up to 1,500+)
                     </h3>
-                    <p style={{ fontSize: "12px", color: "#64748b", margin: "3px 0 0" }}>
-                      Paste numbers or upload a .csv / .txt list of customers.
+                    <p style={{ fontSize: "12px", color: "#6d7175", margin: "2px 0 0" }}>
+                      Paste phone numbers or upload a .csv / .txt file.
                     </p>
                   </div>
                   <label
                     style={{
-                      background: "#f0fdf4",
-                      color: "#16a34a",
-                      border: "1px solid #bbf7d0",
-                      padding: "6px 12px",
-                      borderRadius: "6px",
+                      background: "#ffffff",
+                      color: "#202223",
+                      border: "1px solid #babfc3",
+                      padding: "7px 12px",
+                      borderRadius: "8px",
                       fontSize: "12px",
-                      fontWeight: 700,
+                      fontWeight: 600,
                       cursor: "pointer",
                       display: "inline-flex",
                       alignItems: "center",
-                      gap: "4px",
+                      gap: "6px",
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    📂 Upload CSV / TXT
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <span>Upload CSV / TXT</span>
                     <input type="file" accept=".csv,.txt" onChange={handleFileUpload} style={{ display: "none" }} />
                   </label>
                 </div>
@@ -3751,30 +3762,39 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                   rows={8}
                   value={waNumbersInput}
                   onChange={(e) => setWaNumbersInput(e.target.value)}
-                  placeholder="Paste up to 1,500 numbers here (separated by newlines, commas, or spaces)&#10;e.g.&#10;0611024055&#10;+252612221855&#10;252615551234..."
+                  placeholder="Paste numbers separated by commas, spaces, or new lines:&#10;0611024055&#10;+252612221855&#10;252615551234"
                   style={{
                     width: "100%",
-                    padding: "12px",
+                    padding: "10px 12px",
                     borderRadius: "8px",
-                    border: "1px solid #cbd5e1",
+                    border: "1px solid #babfc3",
                     fontSize: "13px",
-                    fontFamily: "monospace",
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                     boxSizing: "border-box",
                     lineHeight: 1.5,
+                    color: "#202223",
                   }}
                 />
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", gap: "10px", flexWrap: "wrap" }}>
                   <button
                     type="button"
                     onClick={() => handleParseNumbers(waNumbersInput)}
-                    className="btn-primary"
-                    style={{ padding: "8px 16px", fontSize: "13px", fontWeight: 700 }}
+                    style={{
+                      background: "#111827",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "9px 14px",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
                   >
-                    ⚡ Clean &amp; Format Numbers
+                    Format Numbers
                   </button>
                   {waImportSummary && (
-                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#16a34a" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 600, color: "#008060" }}>
                       {waImportSummary}
                     </span>
                   )}
@@ -3782,9 +3802,9 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
 
                 {/* Number preview pill list */}
                 {waParsedNumbers.length > 0 && (
-                  <div style={{ marginTop: "16px", borderTop: "1px solid #f1f5f9", paddingTop: "14px" }}>
-                    <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: "8px" }}>
-                      Previewing Next Contacts ({Math.min(10, waParsedNumbers.length)} of {waParsedNumbers.length}):
+                  <div style={{ marginTop: "16px", borderTop: "1px solid #f1f2f3", paddingTop: "14px" }}>
+                    <div style={{ fontSize: "11px", fontWeight: 600, color: "#6d7175", textTransform: "uppercase", marginBottom: "8px" }}>
+                      Preview ({Math.min(30, waParsedNumbers.length)} of {waParsedNumbers.length})
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", maxHeight: "120px", overflowY: "auto" }}>
                       {waParsedNumbers.slice(0, 30).map((num, i) => (
@@ -3792,15 +3812,16 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                           key={num}
                           style={{
                             fontSize: "11px",
-                            fontFamily: "monospace",
-                            background: waSentNumbers.includes(num) ? "#dcfce7" : i === waCurrentIndex ? "#fef3c7" : "#f1f5f9",
-                            color: waSentNumbers.includes(num) ? "#15803d" : i === waCurrentIndex ? "#b45309" : "#334155",
+                            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                            background: waSentNumbers.includes(num) ? "#e3f1df" : i === waCurrentIndex ? "#fff4e5" : "#f6f6f7",
+                            color: waSentNumbers.includes(num) ? "#008060" : i === waCurrentIndex ? "#9a5b00" : "#202223",
+                            border: "1px solid #e1e3e5",
                             padding: "3px 8px",
                             borderRadius: "6px",
                             fontWeight: 600,
                           }}
                         >
-                          {waSentNumbers.includes(num) ? "✓ " : i === waCurrentIndex ? "▶ " : ""}
+                          {waSentNumbers.includes(num) ? "Sent: " : i === waCurrentIndex ? "Next: " : ""}
                           +{num}
                         </span>
                       ))}
@@ -3810,9 +3831,9 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
               </div>
 
               {/* Right Column: Message Composer & Live Preview */}
-              <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "20px" }}>
-                <h3 style={{ fontSize: "16px", fontWeight: 700, margin: "0 0 12px", color: "#0f172a" }}>
-                  2. Broadcast Message Template
+              <div style={{ background: "#ffffff", border: "1px solid #e1e3e5", borderRadius: "12px", padding: "20px" }}>
+                <h3 style={{ fontSize: "15px", fontWeight: 600, margin: "0 0 12px", color: "#202223" }}>
+                  2. Promo Message
                 </h3>
 
                 {/* Template Quick Selectors */}
@@ -3821,34 +3842,34 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                     type="button"
                     onClick={() =>
                       setWaMessageText(
-                        "Asc Macaamiil! Ku soo dhowow QuickSuuq — Dalbo Khudaarta, Raashinka, iyo Qalabka Guriga oo laguugu keeno meelkasta oo Mogadishu ah 🚚💨.\n\n👉 Booqo dukaanka: https://quicksuuq-test.myshopify.com\n\nMahadsanid!"
+                        "Asc Macaamiil! Ku soo dhowow QuickSuuq - Dalbo Khudaarta, Raashinka, iyo Qalabka Guriga oo laguugu keeno meelkasta oo Mogadishu ah.\n\nBooqo dukaanka: https://quicksuuq-test.myshopify.com\n\nMahadsanid!"
                       )
                     }
-                    style={{ fontSize: "11px", padding: "4px 8px", borderRadius: "6px", background: "#f8fafc", border: "1px solid #cbd5e1", cursor: "pointer" }}
+                    style={{ fontSize: "12px", fontWeight: 500, padding: "5px 10px", borderRadius: "6px", background: "#f6f6f7", color: "#202223", border: "1px solid #d2d5d8", cursor: "pointer" }}
                   >
-                    🍎 General Promo
+                    General Promo
                   </button>
                   <button
                     type="button"
                     onClick={() =>
                       setWaMessageText(
-                        "Asc Macaamiil! QuickSuuq waxaad hadda ka helaysaa dhimis 20% ah dhammaan khudaarta & hilibka cusub maanta! 🥩🥦\n\nDalbo hadda kahor intaysan kaa dhammaan:\n👉 https://quicksuuq-test.myshopify.com\n\nDelivery degdeg ah oo Mogadishu ah!"
+                        "Asc Macaamiil! QuickSuuq waxaad hadda ka helaysaa dhimis 20% ah dhammaan khudaarta & hilibka cusub maanta.\n\nDalbo hadda:\nhttps://quicksuuq-test.myshopify.com\n\nDelivery degdeg ah oo Mogadishu ah!"
                       )
                     }
-                    style={{ fontSize: "11px", padding: "4px 8px", borderRadius: "6px", background: "#f8fafc", border: "1px solid #cbd5e1", cursor: "pointer" }}
+                    style={{ fontSize: "12px", fontWeight: 500, padding: "5px 10px", borderRadius: "6px", background: "#f6f6f7", color: "#202223", border: "1px solid #d2d5d8", cursor: "pointer" }}
                   >
-                    🔥 20% Discount
+                    20% Discount
                   </button>
                   <button
                     type="button"
                     onClick={() =>
                       setWaMessageText(
-                        "Asc Macaamiil! Dalbo Raashinka bisha oo dhan (Bariis, Baasto, Saliid, Caanaha Geela) oo gurigaaga laguugu keeno adigoon suuq u aadin.\n\n👉 https://quicksuuq-test.myshopify.com\n\nQuickSuuq — Suuqaaga Casriga Ah."
+                        "Asc Macaamiil! Dalbo Raashinka bisha oo dhan (Bariis, Baasto, Saliid, Caanaha Geela) oo gurigaaga laguugu keeno adigoon suuq u aadin.\n\nhttps://quicksuuq-test.myshopify.com\n\nQuickSuuq - Suuqaaga Casriga Ah."
                       )
                     }
-                    style={{ fontSize: "11px", padding: "4px 8px", borderRadius: "6px", background: "#f8fafc", border: "1px solid #cbd5e1", cursor: "pointer" }}
+                    style={{ fontSize: "12px", fontWeight: 500, padding: "5px 10px", borderRadius: "6px", background: "#f6f6f7", color: "#202223", border: "1px solid #d2d5d8", cursor: "pointer" }}
                   >
-                    📦 Monthly Groceries
+                    Monthly Groceries
                   </button>
                 </div>
 
@@ -3858,34 +3879,35 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                   onChange={(e) => setWaMessageText(e.target.value)}
                   style={{
                     width: "100%",
-                    padding: "12px",
+                    padding: "10px 12px",
                     borderRadius: "8px",
-                    border: "1px solid #cbd5e1",
+                    border: "1px solid #babfc3",
                     fontSize: "13px",
                     boxSizing: "border-box",
                     lineHeight: 1.5,
+                    color: "#202223",
                   }}
                 />
-                <div style={{ fontSize: "11px", color: "#64748b", margin: "6px 0 14px", display: "flex", justifyContent: "space-between" }}>
+                <div style={{ fontSize: "11px", color: "#6d7175", margin: "6px 0 14px", display: "flex", justifyContent: "space-between" }}>
                   <span>Variables: <code>{'{phone}'}</code>, <code>{'{link}'}</code></span>
                   <span>{waMessageText.length} characters</span>
                 </div>
 
-                {/* Simulated WhatsApp Chat Bubble */}
-                <div style={{ background: "#e5ddd5", borderRadius: "10px", padding: "12px", marginBottom: "16px" }}>
-                  <div style={{ fontSize: "10px", fontWeight: 700, color: "#4b5563", marginBottom: "4px", textTransform: "uppercase" }}>
-                    WhatsApp Preview:
+                {/* Clean Message Preview */}
+                <div style={{ background: "#f6f6f7", border: "1px solid #e1e3e5", borderRadius: "8px", padding: "12px", marginBottom: "14px" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: "#6d7175", marginBottom: "6px", textTransform: "uppercase" }}>
+                    Message Preview
                   </div>
                   <div
                     style={{
                       background: "#ffffff",
+                      border: "1px solid #e1e3e5",
                       borderRadius: "8px",
                       padding: "10px 12px",
                       fontSize: "13px",
-                      lineHeight: 1.4,
-                      color: "#111827",
+                      lineHeight: 1.45,
+                      color: "#202223",
                       whiteSpace: "pre-wrap",
-                      boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
                     }}
                   >
                     {waMessageText
@@ -3894,16 +3916,16 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                   </div>
                 </div>
 
-                {/* Queue Control Buttons */}
-                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "14px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#334155" }}>
-                      Safe Delay Between Sends:
+                {/* Queue Controls */}
+                <div style={{ background: "#f6f6f7", border: "1px solid #e1e3e5", borderRadius: "8px", padding: "14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", gap: "8px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 600, color: "#202223" }}>
+                      Delay Between Sends
                     </span>
                     <select
                       value={waDelaySeconds}
                       onChange={(e) => setWaDelaySeconds(Number(e.target.value))}
-                      style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px" }}
+                      style={{ padding: "5px 10px", borderRadius: "6px", border: "1px solid #babfc3", fontSize: "12px", background: "#ffffff", color: "#202223" }}
                     >
                       <option value={4}>4 seconds (Fast)</option>
                       <option value={6}>6 seconds (Recommended)</option>
@@ -3915,16 +3937,16 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                   {/* Progress Bar */}
                   {waParsedNumbers.length > 0 && (
                     <div style={{ marginBottom: "12px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: 600, color: "#64748b", marginBottom: "4px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: 600, color: "#6d7175", marginBottom: "4px" }}>
                         <span>Progress: {waSentNumbers.length} of {waParsedNumbers.length}</span>
                         <span>{Math.round((waSentNumbers.length / waParsedNumbers.length) * 100)}%</span>
                       </div>
-                      <div style={{ width: "100%", height: "8px", background: "#e2e8f0", borderRadius: "99px", overflow: "hidden" }}>
+                      <div style={{ width: "100%", height: "6px", background: "#e1e3e5", borderRadius: "99px", overflow: "hidden" }}>
                         <div
                           style={{
                             width: `${(waSentNumbers.length / waParsedNumbers.length) * 100}%`,
                             height: "100%",
-                            background: "#16a34a",
+                            background: "#008060",
                             transition: "width 0.3s ease",
                           }}
                         />
@@ -3939,18 +3961,18 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                       onClick={() => setWaIsRunning(!waIsRunning)}
                       style={{
                         flex: 1,
-                        background: waIsRunning ? "#dc2626" : "#16a34a",
+                        background: waIsRunning ? "#d72c0d" : "#008060",
                         color: "#ffffff",
                         border: "none",
-                        padding: "10px 16px",
+                        padding: "9px 14px",
                         borderRadius: "8px",
                         fontSize: "13px",
-                        fontWeight: 700,
+                        fontWeight: 600,
                         cursor: waParsedNumbers.length > 0 ? "pointer" : "not-allowed",
-                        boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+                        opacity: waParsedNumbers.length > 0 ? 1 : 0.6,
                       }}
                     >
-                      {waIsRunning ? "⏸ Pause Auto-Queue" : "▶ Start Auto-Broadcast (1,500)"}
+                      {waIsRunning ? "Pause Broadcast" : `Start Broadcast (${waParsedNumbers.length || "0"})`}
                     </button>
 
                     <button
@@ -3971,16 +3993,16 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                       }}
                       style={{
                         background: "#ffffff",
-                        color: "#0f172a",
-                        border: "1px solid #cbd5e1",
-                        padding: "10px 14px",
+                        color: "#202223",
+                        border: "1px solid #babfc3",
+                        padding: "9px 14px",
                         borderRadius: "8px",
                         fontSize: "13px",
                         fontWeight: 600,
                         cursor: waParsedNumbers.length > 0 ? "pointer" : "not-allowed",
                       }}
                     >
-                      ⏭ Send Next (1x)
+                      Send Next (1x)
                     </button>
 
                     <button
