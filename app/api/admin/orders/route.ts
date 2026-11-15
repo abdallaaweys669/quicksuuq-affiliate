@@ -60,15 +60,15 @@ function resolveStage(
 function stageToMetafieldStatus(stage: OrderWorkflowStage): string {
   switch (stage) {
     case "UNPAID":
-      return "Pending Dispatch";
+      return "1. Unpaid";
     case "NOT_PREPARED":
-      return "Pending Dispatch";
+      return "2. Paid - Not Prepared";
     case "IN_PROCESS":
-      return "In Process (Preparing)";
+      return "3. In Process";
     case "OUT_FOR_DELIVERY":
-      return "Out for Delivery";
+      return "4. Out for Delivery";
     case "DELIVERED":
-      return "Delivered";
+      return "5. Delivered";
   }
 }
 
@@ -340,6 +340,10 @@ export async function PATCH(request: NextRequest) {
       const errs = gqlRes?.data?.metafieldsSet?.userErrors || [];
       if (errs.length > 0) {
         console.warn("MetafieldsSet userErrors:", errs);
+        return NextResponse.json(
+          { error: errs[0]?.message || "Shopify rejected status update", userErrors: errs },
+          { status: 400 }
+        );
       }
     }
 
