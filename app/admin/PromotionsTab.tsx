@@ -3,6 +3,14 @@
 import { useState } from "react";
 import type { BundleItem, BundleRecord, PromotionRecord } from "@/lib/promotions";
 
+interface StoreProduct {
+  id: string;
+  variantId: string;
+  title: string;
+  price: number;
+  image: string | null;
+}
+
 interface PromotionsTabProps {
   bundles: BundleRecord[];
   promotions: PromotionRecord[];
@@ -10,6 +18,25 @@ interface PromotionsTabProps {
   onRefresh: () => Promise<void>;
   onFeedback: (msg: string) => void;
 }
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "9px 12px",
+  border: "1px solid #d1d5db",
+  borderRadius: "8px",
+  fontSize: "13.5px",
+  color: "#111827",
+  background: "#ffffff",
+  boxSizing: "border-box",
+};
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: "12.5px",
+  fontWeight: 600,
+  color: "#374151",
+  marginBottom: "5px",
+};
 
 export default function PromotionsTab({
   bundles,
@@ -21,16 +48,20 @@ export default function PromotionsTab({
   const [subTab, setSubTab] = useState<"bundles" | "deals">("bundles");
   const [saving, setSaving] = useState(false);
 
+  // Store products cache for picker
+  const [storeProducts, setStoreProducts] = useState<StoreProduct[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productQuery, setProductQuery] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+
   // Bundle modal state
   const [showBundleModal, setShowBundleModal] = useState(false);
   const [editingBundleId, setEditingBundleId] = useState<string | null>(null);
   const [bTitle, setBTitle] = useState("");
   const [bPoster, setBPoster] = useState("");
-  const [bItems, setBItems] = useState<BundleItem[]>([{ title: "", qty: 1, unitPrice: 0 }]);
+  const [bItems, setBItems] = useState<BundleItem[]>([]);
   const [bPrice, setBPrice] = useState("15.00");
   const [bStock, setBStock] = useState("50");
-  const [bCommType, setBCommType] = useState<"DEFAULT" | "PERCENT" | "FIXED">("DEFAULT");
-  const [bCommValue, setBCommValue] = useState("0");
   const [bActive, setBActive] = useState(true);
 
   // Delivery Deal modal state
@@ -46,30 +77,59 @@ export default function PromotionsTab({
   const bundlePriceNum = Number(bPrice) || 0;
   const savings = Math.max(0, regularTotal - bundlePriceNum);
 
+  async function ensureProductsLoaded() {
+    if (storeProducts.length > 0 || productsLoading) return;
+    setProductsLoading(true);
+    try {
+      const res = await adminFetch("/api/admin/products");
+      if (res.ok) {
+        const d = await res.json();
+        setStoreProducts(Array.isArray(d.products) ? d.products : []);
+      }
+    } catch (err) {
+      console.error("Failed to load store products:", err);
+    } finally {
+      setProductsLoading(false);
+    }
+  }
+
   function openNewBundleModal() {
     setEditingBundleId(null);
     setBTitle("");
     setBPoster("");
-    setBItems([{ title: "", qty: 1, unitPrice: 0 }]);
+    setBItems([]);
     setBPrice("15.00");
     setBStock("50");
-    setBCommType("DEFAULT");
-    setBCommValue("0");
     setBActive(true);
+    setProductQuery("");
+    setPickerOpen(true);
     setShowBundleModal(true);
+    ensureProductsLoaded();
   }
 
   function openEditBundleModal(b: BundleRecord) {
     setEditingBundleId(b.id);
     setBTitle(b.title);
     setBPoster(b.poster_url || "");
-    setBItems(b.items.length > 0 ? b.items : [{ title: "", qty: 1, unitPrice: 0 }]);
+    setBItems(b.items.length > 0 ? b.items : []);
     setBPrice(b.bundle_price.toFixed(2));
     setBStock(String(b.stock));
-    setBCommType(b.commission_type);
-    setBCommValue(String(b.commission_value));
     setBActive(b.is_active);
+    setProductQuery("");
+    setPickerOpen(false);
     setShowBundleModal(true);
+    ensureProductsLoaded();
+  }
+
+  function addProductToBundle(prod: StoreProduct) {
+    const idx = bItems.findIndex((it) => it.title.toLowerCase() === prod.title.toLowerCase());
+    if (idx >= 0) {
+      const next = [...bItems];
+      next[idx] = { ...next[idx], qty: next[idx].qty + 1 };
+      setBItems(next);
+    } else {
+      setBItems([...bItems, { title: prod.title, qty: 1, unitPrice: prod.price }]);
+    }
   }
 
   async function handleSaveBundle(e: React.FormEvent) {
@@ -87,8 +147,8 @@ export default function PromotionsTab({
         regular_price: regularTotal,
         bundle_price: bundlePriceNum,
         stock: Number(bStock) || 0,
-        commission_type: bCommType,
-        commission_value: bCommType === "DEFAULT" ? 0 : Number(bCommValue) || 0,
+        commission_type: "DEFAULT",
+        commission_value: 0,
         is_active: bActive,
       };
       const res = await adminFetch("/api/admin/promotions", {
@@ -188,6 +248,10 @@ export default function PromotionsTab({
     }
   }
 
+  const filteredProducts = storeProducts
+    .filter((p) => !productQuery.trim() || p.title.toLowerCase().includes(productQuery.trim().toLowerCase()))
+    .slice(0, 30);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       {/* Sub-navigation & CTA */}
@@ -263,7 +327,7 @@ export default function PromotionsTab({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
             gap: "16px",
           }}
         >
@@ -275,12 +339,6 @@ export default function PromotionsTab({
 
           {bundles.map((b) => {
             const saveAmt = Math.max(0, b.regular_price - b.bundle_price);
-            const commLabel =
-              b.commission_type === "FIXED"
-                ? `$${b.commission_value.toFixed(2)} / sale`
-                : b.commission_type === "PERCENT"
-                ? `${b.commission_value}% commission`
-                : "Default rate";
 
             return (
               <div
@@ -300,7 +358,7 @@ export default function PromotionsTab({
                     <img
                       src={b.poster_url}
                       alt={b.title}
-                      style={{ width: "100%", height: "240px", objectFit: "contain", background: "#eef6f0", display: "block" }}
+                      style={{ width: "100%", height: "230px", objectFit: "contain", background: "#eef6f0", display: "block" }}
                     />
                   ) : (
                     <div
@@ -321,8 +379,8 @@ export default function PromotionsTab({
                   )}
 
                   <div style={{ padding: "14px 16px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px", marginBottom: "8px" }}>
-                      <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#111827" }}>{b.title}</h3>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px", marginBottom: "6px" }}>
+                      <h3 style={{ margin: 0, fontSize: "15.5px", fontWeight: 700, color: "#111827" }}>{b.title}</h3>
                       <span
                         style={{
                           fontSize: "11px",
@@ -339,13 +397,11 @@ export default function PromotionsTab({
                       </span>
                     </div>
 
-                    {/* Clean 1-line items summary */}
                     <p style={{ margin: "0 0 10px", fontSize: "12.5px", color: "#6b7280" }}>
                       {b.items.length} {b.items.length === 1 ? "item" : "items"} included
-                      {b.items.length > 0 ? ` · ${b.items[0].title.split("·")[0].trim()}...` : ""}
+                      {b.items.length > 0 ? ` · ${b.items[0].title.split("·")[0].trim()}` : ""}
                     </p>
 
-                    {/* Price & savings */}
                     <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "10px" }}>
                       <span style={{ fontSize: "20px", fontWeight: 800, color: "#111827" }}>
                         ${b.bundle_price.toFixed(2)}
@@ -362,18 +418,14 @@ export default function PromotionsTab({
                       )}
                     </div>
 
-                    {/* Stock, Sold, Commission */}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", fontSize: "12px", color: "#6b7280" }}>
                       <span>Stock: <strong>{b.stock}</strong></span>
                       <span>·</span>
                       <span>Sold: <strong>{b.sold_count}</strong></span>
-                      <span>·</span>
-                      <span>{commLabel}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Actions */}
                 <div
                   style={{
                     padding: "10px 16px",
@@ -385,11 +437,7 @@ export default function PromotionsTab({
                     gap: "8px",
                   }}
                 >
-                  <button
-                    type="button"
-                    className="btn-small"
-                    onClick={() => handleToggleBundle(b)}
-                  >
+                  <button type="button" className="btn-small" onClick={() => handleToggleBundle(b)}>
                     {b.is_active ? "Hide" : "Show"}
                   </button>
                   <div style={{ display: "flex", gap: "6px" }}>
@@ -503,34 +551,59 @@ export default function PromotionsTab({
       {/* MODAL: ADD / EDIT BUNDLE */}
       {showBundleModal && (
         <div className="modal-backdrop">
-          <div className="modal-card" style={{ maxWidth: "560px", maxHeight: "90vh", overflowY: "auto" }}>
-            <h3>{editingBundleId ? "Edit Bundle" : "Create New Bundle"}</h3>
-            <p className="modal-sub">Combine items into a value pack with custom pricing and affiliate commission.</p>
-            <form onSubmit={handleSaveBundle} className="modal-form">
-              <div className="modal-grid-2">
-                <div className="form-group">
-                  <label>Bundle Name *</label>
+          <div
+            className="modal-card"
+            style={{
+              maxWidth: "600px",
+              width: "95%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              borderRadius: "16px",
+              padding: "22px 24px",
+            }}
+          >
+            <h3 style={{ margin: "0 0 4px", fontSize: "18px", fontWeight: 700, color: "#111827" }}>
+              {editingBundleId ? "Edit Bundle" : "Create New Bundle"}
+            </h3>
+            <p style={{ margin: "0 0 16px", fontSize: "13px", color: "#6b7280" }}>
+              Pick real products from your Shopify store and set your bundle price.
+            </p>
+
+            <form onSubmit={handleSaveBundle} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={labelStyle}>Bundle Name *</label>
                   <input
+                    style={inputStyle}
                     type="text"
-                    placeholder="e.g. Set A — Qado Qoys"
+                    placeholder="e.g. Xirmada Qudaarta — Set A"
                     value={bTitle}
                     onChange={(e) => setBTitle(e.target.value)}
                     required
                   />
                 </div>
-                <div className="form-group">
-                  <label>Poster Image (Upload or URL)</label>
+                <div>
+                  <label style={labelStyle}>Poster Image</label>
                   <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                     <input
+                      style={{ ...inputStyle, flex: 1 }}
                       type="text"
-                      placeholder="https://... or upload image"
+                      placeholder="Upload or paste URL"
                       value={bPoster}
                       onChange={(e) => setBPoster(e.target.value)}
-                      style={{ flex: 1 }}
                     />
                     <label
-                      className="btn-small"
-                      style={{ cursor: "pointer", whiteSpace: "nowrap", margin: 0, padding: "8px 10px" }}
+                      style={{
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                        padding: "9px 12px",
+                        borderRadius: "8px",
+                        border: "1px solid #d1d5db",
+                        background: "#f9fafb",
+                        fontSize: "12.5px",
+                        fontWeight: 600,
+                        color: "#374151",
+                      }}
                     >
                       Upload
                       <input
@@ -552,24 +625,147 @@ export default function PromotionsTab({
                 </div>
               </div>
 
-              {/* Items inside */}
-              <div className="form-group">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                  <label style={{ margin: 0 }}>Items Inside Bundle</label>
+              {/* REAL SHOPIFY PRODUCT PICKER */}
+              <div
+                style={{
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "12px",
+                  padding: "12px",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", gap: "8px" }}>
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>Add Real Store Products</label>
                   <button
                     type="button"
-                    className="btn-small"
-                    onClick={() => setBItems([...bItems, { title: "", qty: 1, unitPrice: 0 }])}
+                    onClick={() => {
+                      setPickerOpen(!pickerOpen);
+                      ensureProductsLoaded();
+                    }}
+                    style={{
+                      border: "1px solid #a7f3d0",
+                      background: "#ecfdf5",
+                      color: "#0e8a60",
+                      padding: "4px 10px",
+                      borderRadius: "7px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
                   >
-                    + Add Item
+                    {pickerOpen ? "Hide Product List" : "Browse Store Products"}
                   </button>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+
+                {pickerOpen && (
+                  <div style={{ marginBottom: "10px" }}>
+                    <input
+                      type="search"
+                      style={{ ...inputStyle, marginBottom: "8px" }}
+                      placeholder="Search your Shopify products (e.g. Yaanyo, Baradho, Milk)..."
+                      value={productQuery}
+                      onChange={(e) => setProductQuery(e.target.value)}
+                    />
+                    <div
+                      style={{
+                        maxHeight: "170px",
+                        overflowY: "auto",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "8px",
+                        background: "#ffffff",
+                      }}
+                    >
+                      {productsLoading ? (
+                        <div style={{ padding: "14px", fontSize: "12.5px", color: "#6b7280", textAlign: "center" }}>
+                          Loading products from Shopify...
+                        </div>
+                      ) : filteredProducts.length === 0 ? (
+                        <div style={{ padding: "14px", fontSize: "12.5px", color: "#6b7280", textAlign: "center" }}>
+                          No matching products found.
+                        </div>
+                      ) : (
+                        filteredProducts.map((prod) => (
+                          <div
+                            key={prod.id}
+                            onClick={() => addProductToBundle(prod)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: "10px",
+                              padding: "8px 10px",
+                              borderBottom: "1px solid #f3f4f6",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                              {prod.image ? (
+                                <img
+                                  src={prod.image}
+                                  alt=""
+                                  style={{ width: "30px", height: "30px", borderRadius: "6px", objectFit: "cover", flexShrink: 0 }}
+                                />
+                              ) : (
+                                <div style={{ width: "30px", height: "30px", borderRadius: "6px", background: "#f3f4f6", flexShrink: 0 }} />
+                              )}
+                              <span
+                                style={{
+                                  fontSize: "13px",
+                                  color: "#111827",
+                                  fontWeight: 500,
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}
+                              >
+                                {prod.title}
+                              </span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                              <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#374151" }}>
+                                ${prod.price.toFixed(2)}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: "11.5px",
+                                  fontWeight: 700,
+                                  color: "#ffffff",
+                                  background: "#16b981",
+                                  padding: "3px 8px",
+                                  borderRadius: "6px",
+                                }}
+                              >
+                                + Add
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Selected items inside bundle */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+                  {bItems.length === 0 && (
+                    <p style={{ margin: "4px 0", fontSize: "12.5px", color: "#6b7280" }}>
+                      No items added yet. Click any product above to add it.
+                    </p>
+                  )}
                   {bItems.map((it, idx) => (
-                    <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 70px 90px 32px", gap: "6px", alignItems: "center" }}>
+                    <div
+                      key={idx}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 64px 82px 30px",
+                        gap: "6px",
+                        alignItems: "center",
+                      }}
+                    >
                       <input
+                        style={inputStyle}
                         type="text"
-                        placeholder="Item name (e.g. Rice 5kg)"
+                        placeholder="Item name"
                         value={it.title}
                         onChange={(e) => {
                           const next = [...bItems];
@@ -579,9 +775,10 @@ export default function PromotionsTab({
                         required
                       />
                       <input
+                        style={inputStyle}
                         type="number"
                         min="1"
-                        placeholder="Qty"
+                        title="Quantity"
                         value={it.qty}
                         onChange={(e) => {
                           const next = [...bItems];
@@ -590,10 +787,11 @@ export default function PromotionsTab({
                         }}
                       />
                       <input
+                        style={inputStyle}
                         type="number"
                         step="0.01"
                         min="0"
-                        placeholder="Price $"
+                        title="Unit Price ($)"
                         value={it.unitPrice}
                         onChange={(e) => {
                           const next = [...bItems];
@@ -604,26 +802,53 @@ export default function PromotionsTab({
                       <button
                         type="button"
                         onClick={() => setBItems(bItems.filter((_, i) => i !== idx))}
-                        disabled={bItems.length <= 1}
-                        style={{ border: "none", background: "#fee2e2", color: "#dc2626", borderRadius: "6px", height: "34px", cursor: "pointer" }}
+                        style={{
+                          border: "none",
+                          background: "#fee2e2",
+                          color: "#dc2626",
+                          borderRadius: "7px",
+                          height: "36px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
                       >
                         ×
                       </button>
                     </div>
                   ))}
                 </div>
-                <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#4b5563" }}>
-                  Normal item-by-item total: <strong>${regularTotal.toFixed(2)}</strong>
-                  {savings > 0 && (
-                    <span style={{ color: "#0e8a60", fontWeight: 700 }}> · Customer saves ${savings.toFixed(2)}</span>
-                  )}
-                </p>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", flexWrap: "wrap", gap: "8px" }}>
+                  <p style={{ margin: 0, fontSize: "12.5px", color: "#4b5563" }}>
+                    Normal total: <strong>${regularTotal.toFixed(2)}</strong>
+                    {savings > 0 && (
+                      <span style={{ color: "#0e8a60", fontWeight: 700 }}> · Customer saves ${savings.toFixed(2)}</span>
+                    )}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setBItems([...bItems, { title: "", qty: 1, unitPrice: 0 }])}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#4b5563",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    + Add custom line
+                  </button>
+                </div>
               </div>
 
-              <div className="modal-grid-2">
-                <div className="form-group">
-                  <label>Bundle Price ($ USD) *</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={labelStyle}>Bundle Price ($ USD) *</label>
                   <input
+                    style={inputStyle}
                     type="number"
                     step="0.01"
                     min="0"
@@ -632,9 +857,10 @@ export default function PromotionsTab({
                     required
                   />
                 </div>
-                <div className="form-group">
-                  <label>Stock Quantity *</label>
+                <div>
+                  <label style={labelStyle}>Stock Quantity *</label>
                   <input
+                    style={inputStyle}
                     type="number"
                     min="0"
                     value={bStock}
@@ -644,42 +870,26 @@ export default function PromotionsTab({
                 </div>
               </div>
 
-              <div className="modal-grid-2">
-                <div className="form-group">
-                  <label>Affiliate Commission</label>
-                  <select
-                    value={bCommType}
-                    onChange={(e) => setBCommType(e.target.value as "DEFAULT" | "PERCENT" | "FIXED")}
-                  >
-                    <option value="DEFAULT">Use Default Store Rate</option>
-                    <option value="FIXED">Fixed $ per Bundle</option>
-                    <option value="PERCENT">Custom % Rate</option>
-                  </select>
-                </div>
-                {bCommType !== "DEFAULT" && (
-                  <div className="form-group">
-                    <label>{bCommType === "FIXED" ? "Amount ($ USD)" : "Percent (%)"}</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={bCommValue}
-                      onChange={(e) => setBCommValue(e.target.value)}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "#374151", cursor: "pointer" }}>
                 <input type="checkbox" checked={bActive} onChange={(e) => setBActive(e.target.checked)} />
                 Show on QuickSuuq website
               </label>
 
-              <div className="modal-actions">
-                <button type="button" className="btn-secondary" onClick={() => setShowBundleModal(false)}>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "4px" }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ padding: "9px 16px", borderRadius: "8px" }}
+                  onClick={() => setShowBundleModal(false)}
+                >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary" disabled={saving}>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{ padding: "9px 18px", borderRadius: "8px", background: "#16b981", borderColor: "#16b981" }}
+                  disabled={saving}
+                >
                   {saving ? "Saving..." : editingBundleId ? "Save Changes" : "Create Bundle"}
                 </button>
               </div>
@@ -691,13 +901,18 @@ export default function PromotionsTab({
       {/* MODAL: ADD DELIVERY DEAL */}
       {showDealModal && (
         <div className="modal-backdrop">
-          <div className="modal-card" style={{ maxWidth: "480px" }}>
-            <h3>Create Delivery Promotion</h3>
-            <p className="modal-sub">Time-limited Free Delivery rule that stops automatically when full or expired.</p>
-            <form onSubmit={handleSaveDeal} className="modal-form">
-              <div className="form-group">
-                <label>Promotion Title *</label>
+          <div className="modal-card" style={{ maxWidth: "480px", width: "95%", borderRadius: "16px", padding: "22px 24px" }}>
+            <h3 style={{ margin: "0 0 4px", fontSize: "18px", fontWeight: 700, color: "#111827" }}>
+              Create Delivery Promotion
+            </h3>
+            <p style={{ margin: "0 0 16px", fontSize: "13px", color: "#6b7280" }}>
+              Time-limited Free Delivery rule that stops automatically when full or expired.
+            </p>
+            <form onSubmit={handleSaveDeal} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div>
+                <label style={labelStyle}>Promotion Title *</label>
                 <input
+                  style={inputStyle}
                   type="text"
                   placeholder="e.g. First 20 Customers Free Delivery"
                   value={dTitle}
@@ -706,22 +921,50 @@ export default function PromotionsTab({
                 />
               </div>
 
-              <div className="form-group">
-                <label>Rule Type</label>
-                <select
-                  value={dRuleType}
-                  onChange={(e) => setDRuleType(e.target.value as "FIRST_N_CUSTOMERS" | "MIN_ORDER_AMOUNT")}
-                >
-                  <option value="FIRST_N_CUSTOMERS">First N Customers (Free Delivery)</option>
-                  <option value="MIN_ORDER_AMOUNT">Orders Over $X (Free Delivery)</option>
-                </select>
+              <div>
+                <label style={labelStyle}>Rule Type</label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setDRuleType("FIRST_N_CUSTOMERS")}
+                    style={{
+                      padding: "9px 10px",
+                      borderRadius: "8px",
+                      border: dRuleType === "FIRST_N_CUSTOMERS" ? "2px solid #16b981" : "1px solid #d1d5db",
+                      background: dRuleType === "FIRST_N_CUSTOMERS" ? "#ecfdf5" : "#ffffff",
+                      color: dRuleType === "FIRST_N_CUSTOMERS" ? "#0e8a60" : "#374151",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    First N Customers
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDRuleType("MIN_ORDER_AMOUNT")}
+                    style={{
+                      padding: "9px 10px",
+                      borderRadius: "8px",
+                      border: dRuleType === "MIN_ORDER_AMOUNT" ? "2px solid #16b981" : "1px solid #d1d5db",
+                      background: dRuleType === "MIN_ORDER_AMOUNT" ? "#ecfdf5" : "#ffffff",
+                      color: dRuleType === "MIN_ORDER_AMOUNT" ? "#0e8a60" : "#374151",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Orders Over $X
+                  </button>
+                </div>
               </div>
 
-              <div className="modal-grid-2">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 {dRuleType === "FIRST_N_CUSTOMERS" ? (
-                  <div className="form-group">
-                    <label>Customer Limit (N)</label>
+                  <div>
+                    <label style={labelStyle}>Customer Limit (N)</label>
                     <input
+                      style={inputStyle}
                       type="number"
                       min="1"
                       value={dMaxClaims}
@@ -730,9 +973,10 @@ export default function PromotionsTab({
                     />
                   </div>
                 ) : (
-                  <div className="form-group">
-                    <label>Minimum Order ($ USD)</label>
+                  <div>
+                    <label style={labelStyle}>Minimum Order ($ USD)</label>
                     <input
+                      style={inputStyle}
                       type="number"
                       step="0.01"
                       min="1"
@@ -743,9 +987,10 @@ export default function PromotionsTab({
                   </div>
                 )}
 
-                <div className="form-group">
-                  <label>End Date & Time (optional)</label>
+                <div>
+                  <label style={labelStyle}>End Date & Time (optional)</label>
                   <input
+                    style={inputStyle}
                     type="datetime-local"
                     value={dEndsAt}
                     onChange={(e) => setDEndsAt(e.target.value)}
@@ -753,16 +998,26 @@ export default function PromotionsTab({
                 </div>
               </div>
 
-              <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "#374151", cursor: "pointer" }}>
                 <input type="checkbox" checked={dActive} onChange={(e) => setDActive(e.target.checked)} />
                 Activate immediately
               </label>
 
-              <div className="modal-actions">
-                <button type="button" className="btn-secondary" onClick={() => setShowDealModal(false)}>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "4px" }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ padding: "9px 16px", borderRadius: "8px" }}
+                  onClick={() => setShowDealModal(false)}
+                >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary" disabled={saving}>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{ padding: "9px 18px", borderRadius: "8px", background: "#16b981", borderColor: "#16b981" }}
+                  disabled={saving}
+                >
                   {saving ? "Saving..." : "Create Deal"}
                 </button>
               </div>
