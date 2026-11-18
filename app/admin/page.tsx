@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import PromotionsTab from "./PromotionsTab";
+import type { BundleRecord, PromotionRecord } from "@/lib/promotions";
 
 interface Salesperson {
   id: string;
@@ -181,8 +183,10 @@ export default function AdminDashboardPage() {
 
   // Tabs
   const [activeTab, setActiveTab] = useState<
-    "orders" | "commissions" | "salespeople" | "payouts" | "delivery" | "storefront" | "whatsapp"
+    "orders" | "commissions" | "salespeople" | "payouts" | "delivery" | "storefront" | "promotions" | "whatsapp"
   >("commissions");
+  const [bundlesList, setBundlesList] = useState<BundleRecord[]>([]);
+  const [promotionsList, setPromotionsList] = useState<PromotionRecord[]>([]);
   const [deliverySubTab, setDeliverySubTab] = useState<"areas" | "vehicles" | "drivers">("areas");
   const [storefrontSubTab, setStorefrontSubTab] = useState<
     "hero" | "categories" | "promos" | "products"
@@ -473,13 +477,14 @@ export default function AdminDashboardPage() {
 
   async function loadAllData() {
     try {
-      const [repsRes, commsRes, paysRes, delivRes, ordsRes, sfRes] = await Promise.all([
+      const [repsRes, commsRes, paysRes, delivRes, ordsRes, sfRes, promoRes] = await Promise.all([
         adminFetch("/api/admin/salespeople"),
         adminFetch("/api/admin/commissions"),
         adminFetch("/api/admin/payouts"),
         adminFetch("/api/admin/delivery"),
         adminFetch("/api/admin/orders"),
         adminFetch("/api/admin/storefront"),
+        adminFetch("/api/admin/promotions"),
       ]);
       if (repsRes.ok) {
         const d = await repsRes.json();
@@ -515,8 +520,22 @@ export default function AdminDashboardPage() {
         if (d.popularProducts) setPopularProducts(d.popularProducts);
         if (d.collections) setStoreCollections(d.collections);
       }
+      if (promoRes.ok) {
+        const d = await promoRes.json();
+        setBundlesList(d.bundles || []);
+        setPromotionsList(d.promotions || []);
+      }
     } catch (e) {
       console.error("Error loading admin data:", e);
+    }
+  }
+
+  async function refreshPromotions() {
+    const r = await adminFetch("/api/admin/promotions");
+    if (r.ok) {
+      const d = await r.json();
+      setBundlesList(d.bundles || []);
+      setPromotionsList(d.promotions || []);
     }
   }
 
@@ -1241,6 +1260,7 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                 {isAffiliateSection && "Affiliate & Partner Network"}
                 {activeTab === "delivery" && "Delivery & Logistics"}
                 {activeTab === "storefront" && "Website Content (CMS)"}
+                {activeTab === "promotions" && "Bundles & Promotions"}
                 {activeTab === "whatsapp" && "WhatsApp Marketing & Broadcast"}
               </h2>
               <div className="rep-meta">
@@ -1249,6 +1269,7 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                   {isAffiliateSection && "Sales team commissions, customer tracking, and EVC Plus batch payouts"}
                   {activeTab === "delivery" && "Mogadishu delivery zones, vehicle weight capacities, and driver registry"}
                   {activeTab === "storefront" && "Hero Slider, Featured Categories, Promo Banners, and Popular Products"}
+                  {activeTab === "promotions" && "Create value bundles and time-limited Free Delivery deals for quicksuuq-test"}
                   {activeTab === "whatsapp" && "Import contacts, create promotional broadcasts, and send via WhatsApp queue"}
                 </span>
               </div>
@@ -1416,6 +1437,7 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                   { id: "payouts", label: `Payouts (${payouts.length})` },
                   { id: "delivery", label: `Delivery (${deliveryAreas.length})` },
                   { id: "storefront", label: "Storefront" },
+                  { id: "promotions", label: `Promotions (${bundlesList.length + promotionsList.length})` },
                   { id: "whatsapp", label: waParsedNumbers.length > 0 ? `Broadcast (${waParsedNumbers.length})` : "Broadcast" },
                 ] as const
               ).map((tab) => {
@@ -3682,6 +3704,17 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
               </div>
             )}
           </div>
+        )}
+
+        {/* Promotions & Bundles Tab */}
+        {activeTab === "promotions" && (
+          <PromotionsTab
+            bundles={bundlesList}
+            promotions={promotionsList}
+            adminFetch={adminFetch}
+            onRefresh={refreshPromotions}
+            onFeedback={showFeedback}
+          />
         )}
 
         {/* 6. WhatsApp Marketing & 1,500 Bulk Broadcast Tab */}
