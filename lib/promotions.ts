@@ -48,6 +48,97 @@ export function slugifyBundle(title: string): string {
   );
 }
 
+const REAL_TEST_SETS: Array<{
+  id: string;
+  title: string;
+  slug: string;
+  poster_url: string;
+  regular_price: number;
+  bundle_price: number;
+  stock: number;
+  sold_count: number;
+  items: BundleItem[];
+}> = [
+  {
+    id: "bnd_xirmada_set_a",
+    title: "Xirmada Qudaarta - Set A (1-2 qof · 10 kg)",
+    slug: "xirmada-qudaarta-set-a",
+    poster_url: "/bundles/set-a.jpg",
+    regular_price: 12.03,
+    bundle_price: 10.5,
+    stock: 40,
+    sold_count: 6,
+    items: [
+      { title: "Yaanyo Tomato", qty: 1, unitPrice: 1.0 },
+      { title: "Basal Cadey - Onion", qty: 1, unitPrice: 1.25 },
+      { title: "Basal Gaduud", qty: 1, unitPrice: 1.0 },
+      { title: "Baradho-Potato", qty: 1, unitPrice: 1.35 },
+      { title: "kaarooto - Carrot", qty: 1, unitPrice: 0.9 },
+      { title: "Barbarooni - Bell pepper", qty: 1, unitPrice: 0.83 },
+      { title: "Qajaar Cucumber", qty: 1, unitPrice: 0.9 },
+      { title: "Kabsar-Parsley", qty: 1, unitPrice: 1.75 },
+      { title: "Toon Garlic", qty: 1, unitPrice: 2.4 },
+      { title: "Liin dhanaan-Lemon", qty: 1, unitPrice: 0.65 },
+    ],
+  },
+  {
+    id: "bnd_xirmada_set_b",
+    title: "Xirmada Qudaarta - Set B (3-4 qof · 20 kg)",
+    slug: "xirmada-qudaarta-set-b",
+    poster_url: "/bundles/set-b.jpg",
+    regular_price: 24.31,
+    bundle_price: 21.0,
+    stock: 30,
+    sold_count: 4,
+    items: [
+      { title: "Yaanyo Tomato", qty: 2, unitPrice: 1.0 },
+      { title: "Basal Cadey - Onion", qty: 2, unitPrice: 1.25 },
+      { title: "Baradho-Potato", qty: 2, unitPrice: 1.35 },
+      { title: "kaarooto - Carrot", qty: 2, unitPrice: 0.9 },
+      { title: "Barbarooni - Bell pepper", qty: 2, unitPrice: 0.83 },
+      { title: "Qajaar Cucumber", qty: 1, unitPrice: 0.9 },
+      { title: "Basal Gaduud", qty: 1, unitPrice: 1.0 },
+      { title: "Baadinjaan (Eggplant)", qty: 1, unitPrice: 1.65 },
+      { title: "Batati Macaan-Sweet potato", qty: 1, unitPrice: 0.9 },
+      { title: "Bocor - Pumpkin", qty: 1, unitPrice: 1.0 },
+      { title: "Kabsar-Parsley", qty: 1, unitPrice: 1.75 },
+      { title: "Toon Garlic", qty: 1, unitPrice: 2.4 },
+      { title: "Basbaas- Hot or chili pepper", qty: 1, unitPrice: 2.4 },
+      { title: "Liin dhanaan-Lemon", qty: 1, unitPrice: 0.65 },
+      { title: "moos", qty: 1, unitPrice: 1.0 },
+    ],
+  },
+  {
+    id: "bnd_xirmada_set_c",
+    title: "Xirmada Qudaarta - Set C (5-8 qof · 30 kg)",
+    slug: "xirmada-qudaarta-set-c",
+    poster_url: "/bundles/set-c.jpg",
+    regular_price: 36.46,
+    bundle_price: 31.5,
+    stock: 20,
+    sold_count: 2,
+    items: [
+      { title: "Yaanyo Tomato", qty: 3, unitPrice: 1.0 },
+      { title: "Basal Cadey - Onion", qty: 3, unitPrice: 1.25 },
+      { title: "Baradho-Potato", qty: 3, unitPrice: 1.35 },
+      { title: "kaarooto - Carrot", qty: 2, unitPrice: 0.9 },
+      { title: "Barbarooni - Bell pepper", qty: 2, unitPrice: 0.83 },
+      { title: "Qajaar Cucumber", qty: 2, unitPrice: 0.9 },
+      { title: "Basal Gaduud", qty: 2, unitPrice: 1.0 },
+      { title: "Baadinjaan (Eggplant)", qty: 2, unitPrice: 1.65 },
+      { title: "Baamiye - Okra", qty: 1, unitPrice: 2.5 },
+      { title: "Batati Macaan-Sweet potato", qty: 2, unitPrice: 0.9 },
+      { title: "Bocor - Pumpkin", qty: 1, unitPrice: 1.0 },
+      { title: "Kabsar-Parsley", qty: 1, unitPrice: 1.75 },
+      { title: "Toon Garlic", qty: 1, unitPrice: 2.4 },
+      { title: "moos", qty: 2, unitPrice: 1.0 },
+      { title: "Basbaas- Hot or chili pepper", qty: 1, unitPrice: 2.4 },
+      { title: "Liin dhanaan-Lemon", qty: 1, unitPrice: 0.65 },
+      { title: "Babaay - Papaya", qty: 1, unitPrice: 0.6 },
+    ],
+  },
+];
+
 export async function ensurePromotionsTables(): Promise<void> {
   if (promotionsReady) return;
 
@@ -87,93 +178,24 @@ export async function ensurePromotionsTables(): Promise<void> {
     );
   `);
 
-  // Seed Set A, Set B, Set C when empty (or upgrade initial starter row)
+  // Ensure starter Set A, B, C use real Shopify store products and min 1 kg
+  const legacyCheck = await query<{ id: string; items_json: string }>(
+    `SELECT id, items_json FROM public.bundles WHERE id IN ('bnd_xirmada_set_a', 'bnd_xirmada_set_b', 'bnd_xirmada_set_c')`
+  );
+  const needsUpgrade = legacyCheck.rows.some((r) => r.items_json.includes("500 g") || r.items_json.includes("500g"));
+
   const bundleCount = await query<{ n: number }>("SELECT count(*)::int AS n FROM public.bundles");
-  const hasStarterOnly =
-    bundleCount.rows[0]?.n === 1 &&
-    (await query("SELECT id FROM public.bundles WHERE id = 'bnd_starter_qado_qoys'")).rows.length === 1;
-
-  if (!bundleCount.rows[0]?.n || hasStarterOnly) {
-    if (hasStarterOnly) {
-      await query("DELETE FROM public.bundles WHERE id = 'bnd_starter_qado_qoys'");
-    }
-    const sets = [
-      {
-        id: "bnd_xirmada_set_a",
-        title: "Xirmada Qudaarta — Set A (1–2 qof · ~9 kg)",
-        slug: "xirmada-qudaarta-set-a",
-        poster_url: "/bundles/set-a.jpg",
-        regular_price: 13.5,
-        bundle_price: 11.5,
-        stock: 40,
-        sold_count: 6,
-        commission_type: "FIXED",
-        commission_value: 1.0,
-        items: [
-          { title: "Yaanyo · 1 kg", qty: 1, unitPrice: 1.5 },
-          { title: "Basal Cadey · 1 kg", qty: 1, unitPrice: 1.3 },
-          { title: "Basal Gaduud · 1 kg", qty: 1, unitPrice: 1.4 },
-          { title: "Baradho · 1 kg", qty: 1, unitPrice: 1.3 },
-          { title: "Kaarooto · 1 kg", qty: 1, unitPrice: 1.4 },
-          { title: "Barbarooni · 1 kg", qty: 1, unitPrice: 1.5 },
-          { title: "Qajaar · 1 kg", qty: 1, unitPrice: 1.2 },
-          { title: "Kabsar · 500 g", qty: 1, unitPrice: 0.9 },
-          { title: "Toon · 500 g", qty: 1, unitPrice: 1.5 },
-          { title: "Liin Dhanaan · 1 kg", qty: 1, unitPrice: 1.5 },
-        ],
-      },
-      {
-        id: "bnd_xirmada_set_b",
-        title: "Xirmada Qudaarta — Set B (3–4 qof · ~19 kg)",
-        slug: "xirmada-qudaarta-set-b",
-        poster_url: "/bundles/set-b.jpg",
-        regular_price: 26.5,
-        bundle_price: 22.5,
-        stock: 30,
-        sold_count: 4,
-        commission_type: "FIXED",
-        commission_value: 2.0,
-        items: [
-          { title: "Yaanyo · 2 kg", qty: 1, unitPrice: 3.0 },
-          { title: "Basal Cadey · 2 kg", qty: 1, unitPrice: 2.6 },
-          { title: "Baradho · 2 kg", qty: 1, unitPrice: 2.6 },
-          { title: "Kaarooto · 2 kg", qty: 1, unitPrice: 2.8 },
-          { title: "Barbarooni · 2 kg", qty: 1, unitPrice: 3.0 },
-          { title: "Qajaar · 1 kg", qty: 1, unitPrice: 1.2 },
-          { title: "Basal Gaduud · 1 kg", qty: 1, unitPrice: 1.4 },
-          { title: "Baadinjaan · 1 kg", qty: 1, unitPrice: 1.5 },
-          { title: "Batati Macaan · 1 kg", qty: 1, unitPrice: 1.4 },
-          { title: "Bocor · 1 xabbo", qty: 1, unitPrice: 1.5 },
-          { title: "Kabsar · 500 g + Toon · 500 g", qty: 1, unitPrice: 2.4 },
-          { title: "Basbaas 500g + Liin 1kg + Moos 6 xabbo", qty: 1, unitPrice: 3.1 },
-        ],
-      },
-      {
-        id: "bnd_xirmada_set_c",
-        title: "Xirmada Qudaarta — Set C (5–8 qof · ~28.5 kg)",
-        slug: "xirmada-qudaarta-set-c",
-        poster_url: "/bundles/set-c.jpg",
-        regular_price: 39.5,
-        bundle_price: 34.0,
-        stock: 20,
-        sold_count: 2,
-        commission_type: "FIXED",
-        commission_value: 3.0,
-        items: [
-          { title: "Yaanyo · 3 kg + Basal Cadey · 3 kg + Baradho · 3 kg", qty: 1, unitPrice: 12.3 },
-          { title: "Kaarooto · 2 kg + Barbarooni · 2 kg + Qajaar · 2 kg", qty: 1, unitPrice: 8.2 },
-          { title: "Basal Gaduud · 2 kg + Baadinjaan · 2 kg + Baamiye · 1 kg", qty: 1, unitPrice: 7.4 },
-          { title: "Batati Macaan · 2 kg + Bocor · 1 xabbo + Kabsar · 1 kg", qty: 1, unitPrice: 5.8 },
-          { title: "Toon 500g + Moos 6 xabbo + Basbaas + Liin + Babaay", qty: 1, unitPrice: 5.8 },
-        ],
-      },
-    ];
-
-    for (const s of sets) {
+  if (!bundleCount.rows[0]?.n || needsUpgrade) {
+    for (const s of REAL_TEST_SETS) {
       await query(
         `INSERT INTO public.bundles (id, title, slug, poster_url, items_json, regular_price, bundle_price, stock, sold_count, commission_type, commission_value, is_active)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, TRUE)
-         ON CONFLICT (id) DO NOTHING`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'DEFAULT', 0, TRUE)
+         ON CONFLICT (id) DO UPDATE SET
+           title = EXCLUDED.title,
+           items_json = EXCLUDED.items_json,
+           regular_price = EXCLUDED.regular_price,
+           bundle_price = EXCLUDED.bundle_price,
+           updated_at = NOW()`,
         [
           s.id,
           s.title,
@@ -184,8 +206,6 @@ export async function ensurePromotionsTables(): Promise<void> {
           s.bundle_price,
           s.stock,
           s.sold_count,
-          s.commission_type,
-          s.commission_value,
         ]
       );
     }
@@ -231,7 +251,7 @@ export function mapBundleRow(row: Record<string, unknown>): BundleRecord {
     bundle_price: Number(row.bundle_price || 0),
     stock: Number(row.stock || 0),
     sold_count: Number(row.sold_count || 0),
-    commission_type: (String(row.commission_type || "DEFAULT") as BundleRecord["commission_type"]),
+    commission_type: String(row.commission_type || "DEFAULT") as BundleRecord["commission_type"],
     commission_value: Number(row.commission_value || 0),
     is_active: Boolean(row.is_active),
     created_at: String(row.created_at),

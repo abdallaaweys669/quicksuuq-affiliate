@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import type { BundleItem, BundleRecord, PromotionRecord } from "@/lib/promotions";
@@ -60,7 +60,8 @@ export default function PromotionsTab({
   const [bTitle, setBTitle] = useState("");
   const [bPoster, setBPoster] = useState("");
   const [bItems, setBItems] = useState<BundleItem[]>([]);
-  const [bPrice, setBPrice] = useState("15.00");
+  const [bPrice, setBPrice] = useState("");
+  const [bPriceManual, setBPriceManual] = useState(false);
   const [bStock, setBStock] = useState("50");
   const [bActive, setBActive] = useState(true);
 
@@ -98,7 +99,8 @@ export default function PromotionsTab({
     setBTitle("");
     setBPoster("");
     setBItems([]);
-    setBPrice("15.00");
+    setBPrice("");
+    setBPriceManual(false);
     setBStock("50");
     setBActive(true);
     setProductQuery("");
@@ -113,6 +115,7 @@ export default function PromotionsTab({
     setBPoster(b.poster_url || "");
     setBItems(b.items.length > 0 ? b.items : []);
     setBPrice(b.bundle_price.toFixed(2));
+    setBPriceManual(true);
     setBStock(String(b.stock));
     setBActive(b.is_active);
     setProductQuery("");
@@ -121,14 +124,25 @@ export default function PromotionsTab({
     ensureProductsLoaded();
   }
 
+  function updateItemsAndSyncPrice(nextItems: BundleItem[]) {
+    setBItems(nextItems);
+    if (!bPriceManual) {
+      const nextTotal = nextItems.reduce(
+        (s, it) => s + (Number(it.qty) || 0) * (Number(it.unitPrice) || 0),
+        0
+      );
+      setBPrice(nextTotal > 0 ? nextTotal.toFixed(2) : "");
+    }
+  }
+
   function addProductToBundle(prod: StoreProduct) {
     const idx = bItems.findIndex((it) => it.title.toLowerCase() === prod.title.toLowerCase());
     if (idx >= 0) {
       const next = [...bItems];
       next[idx] = { ...next[idx], qty: next[idx].qty + 1 };
-      setBItems(next);
+      updateItemsAndSyncPrice(next);
     } else {
-      setBItems([...bItems, { title: prod.title, qty: 1, unitPrice: prod.price }]);
+      updateItemsAndSyncPrice([...bItems, { title: prod.title, qty: 1, unitPrice: prod.price }]);
     }
   }
 
@@ -852,8 +866,12 @@ export default function PromotionsTab({
                     type="number"
                     step="0.01"
                     min="0"
+                    placeholder={regularTotal > 0 ? regularTotal.toFixed(2) : "0.00"}
                     value={bPrice}
-                    onChange={(e) => setBPrice(e.target.value)}
+                    onChange={(e) => {
+                      setBPriceManual(true);
+                      setBPrice(e.target.value);
+                    }}
                     required
                   />
                 </div>
