@@ -124,7 +124,7 @@ export default function BundlesTab({
     setBPoster("");
     setBItems([]);
     setBPrice("");
-    setBDiscountPct("");
+    setBDiscountPct("0");
     setBPriceManual(false);
     setBHasFlash(false);
     setBPromoPrice("");
@@ -149,7 +149,7 @@ export default function BundlesTab({
       b.regular_price > 0 && b.bundle_price < b.regular_price
         ? Math.round(((b.regular_price - b.bundle_price) / b.regular_price) * 100)
         : 0;
-    setBDiscountPct(pct > 0 ? String(pct) : "");
+    setBDiscountPct(pct > 0 ? String(pct) : "0");
     setBPriceManual(true);
     setBHasFlash(Boolean(b.promo_price && b.promo_price > 0));
     setBPromoPrice(b.promo_price ? b.promo_price.toFixed(2) : "");
@@ -219,7 +219,7 @@ export default function BundlesTab({
     const price = Number(raw);
     if (regularTotal > 0 && raw !== "" && !Number.isNaN(price) && price <= regularTotal) {
       const pct = Math.round(((regularTotal - price) / regularTotal) * 100);
-      setBDiscountPct(pct > 0 ? String(pct) : "");
+      setBDiscountPct(pct > 0 ? String(pct) : "0");
     } else {
       setBDiscountPct("");
     }
@@ -792,13 +792,13 @@ export default function BundlesTab({
                 {/* Synced Discount % OR Direct Bundle Price */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                   <div>
-                    <label style={labelStyle}>Discount % (1–99%)</label>
+                    <label style={labelStyle}>Discount % (0–99%)</label>
                     <input
                       style={inputStyle}
                       type="number"
                       min="0"
                       max="99"
-                      placeholder="e.g. 15"
+                      placeholder="0"
                       value={bDiscountPct}
                       onChange={(e) => handleDiscountPctChange(e.target.value)}
                     />

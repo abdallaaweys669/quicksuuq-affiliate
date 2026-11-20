@@ -37,11 +37,20 @@ export async function GET(request: NextRequest) {
       .map((p: any) => {
         const firstVariant = Array.isArray(p.variants) ? p.variants[0] : null;
         const title = String(p.title || "");
-        const titleLower = title.toLowerCase();
+        const haystack = `${title} ${p.product_type || ""} ${p.tags || ""}`.toLowerCase();
         const weightUnit = String(firstVariant?.weight_unit || "").toLowerCase();
         const grams = Number(firstVariant?.grams || 0);
-        const isLiquid = /\b(\d+\s*l|ltr|liter|litre|oil|saliid|milk|caano|juice|cabitan|water|cream)\b/i.test(titleLower);
-        const unit = isLiquid ? "liter" : weightUnit === "kg" || grams >= 1000 ? "kg" : "pcs";
+        const isLiquid =
+          /\b(\d+\s*l|ltr|liter|litre|oil|saliid|milk|caano|juice|cabitan|water|cooking cream|vemto)\b/i.test(
+            haystack
+          );
+        const isKgItem =
+          weightUnit === "kg" ||
+          grams >= 1000 ||
+          /\b(kg|kilo|yaanyo|tomato|basal|onion|baradho|potato|kaarooto|carrot|barbarooni|bell pepper|qajaar|cucumber|baadinjaan|eggplant|baamiye|okra|batati|kabsar|parsley|toon|garlic|basbaas|chili|liin|lemon|moos|banana|sanjabil|ginger|avokaado|avocado|tufax|apple|zeytun|guava|canbe|mango|timir|dates|raqay|tamarind|rice|baris|basmati|sella|flour|sugar|oats|vegetable|qudaar|meat|hilib|black pepper|cloves)\b/i.test(
+            haystack
+          );
+        const unit = isLiquid ? "liter" : isKgItem ? "kg" : "pcs";
         return {
           id: String(p.id),
           variantId: firstVariant ? String(firstVariant.id) : "",
