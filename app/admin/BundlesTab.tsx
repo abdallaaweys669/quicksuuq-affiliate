@@ -45,6 +45,7 @@ export default function BundlesTab({
 }: BundlesTabProps) {
   const [builderOpen, setBuilderOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Store products cache
   const [storeProducts, setStoreProducts] = useState<StoreProduct[]>([]);
@@ -636,16 +637,24 @@ export default function BundlesTab({
   }
 
   // BUNDLES LIST VIEW
+  const visibleBundles = bundles.filter(
+    (b) => !searchTerm.trim() || b.title.toLowerCase().includes(searchTerm.trim().toLowerCase())
+  );
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "12px 0 24px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
-        <p style={{ margin: 0, fontSize: "13.5px", color: "#6b7280" }}>
-          Manage combo packs (Set A, B, C, family packs). Works with or without poster photos.
-        </p>
+        <input
+          type="search"
+          placeholder="Search bundles..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ ...inputStyle, maxWidth: "320px" }}
+        />
         <button
           type="button"
           className="btn-primary"
-          style={{ whiteSpace: "nowrap", padding: "9px 16px", background: "#16b981", borderColor: "#16b981" }}
+          style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: "8px" }}
           onClick={openNewBuilder}
         >
           + New Bundle
@@ -653,13 +662,13 @@ export default function BundlesTab({
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))", gap: "16px" }}>
-        {bundles.length === 0 && (
+        {visibleBundles.length === 0 && (
           <div className="empty-state" style={{ gridColumn: "1 / -1" }}>
-            No bundles yet. Click <strong>+ New Bundle</strong> to create one.
+            No bundles found. Click <strong>+ New Bundle</strong> to create one.
           </div>
         )}
 
-        {bundles.map((b) => {
+        {visibleBundles.map((b) => {
           const hasValidFlash =
             b.promo_price != null &&
             b.promo_price > 0 &&

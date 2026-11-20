@@ -102,16 +102,25 @@ export default function PromotionsTab({
     }
   }
 
+  const [searchTerm, setSearchTerm] = useState("");
+  const visiblePromos = promotions.filter(
+    (p) => !searchTerm.trim() || p.title.toLowerCase().includes(searchTerm.trim().toLowerCase())
+  );
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "12px 0 24px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
-        <p style={{ margin: 0, fontSize: "13.5px", color: "#6b7280" }}>
-          Time-limited campaigns (Free Delivery for first N customers, $35+ Free Delivery, Black Friday % Off).
-        </p>
+        <input
+          type="search"
+          placeholder="Search promotions..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ ...inputStyle, maxWidth: "320px" }}
+        />
         <button
           type="button"
           className="btn-primary"
-          style={{ whiteSpace: "nowrap", padding: "9px 16px", background: "#16b981", borderColor: "#16b981" }}
+          style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: "8px" }}
           onClick={() => setShowDealModal(true)}
         >
           + New Promotion
@@ -119,13 +128,13 @@ export default function PromotionsTab({
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-        {promotions.length === 0 && (
+        {visiblePromos.length === 0 && (
           <div className="empty-state">
-            No promotions yet. Click <strong>+ New Promotion</strong> to launch a Free Delivery or % Off campaign.
+            No promotions found. Click <strong>+ New Promotion</strong> to create one.
           </div>
         )}
 
-        {promotions.map((p) => {
+        {visiblePromos.map((p) => {
           const isFirstN = p.rule_type === "FIRST_N_CUSTOMERS";
           const isPct = p.rule_type === "PERCENT_OFF";
           const max = p.max_claims || 20;

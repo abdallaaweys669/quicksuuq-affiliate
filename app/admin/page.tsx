@@ -1442,7 +1442,6 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                   { id: "storefront", label: "Storefront" },
                   { id: "bundles", label: `Bundles (${bundlesList.length})` },
                   { id: "promotions", label: `Promotions (${promotionsList.length})` },
-                  { id: "whatsapp", label: waParsedNumbers.length > 0 ? `Broadcast (${waParsedNumbers.length})` : "Broadcast" },
                 ] as const
               ).map((tab) => {
                 const isActive = activeTab === tab.id;
