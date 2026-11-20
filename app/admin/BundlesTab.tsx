@@ -8,7 +8,13 @@ interface StoreProduct {
   variantId: string;
   title: string;
   price: number;
+  unit?: "kg" | "pcs";
   image: string | null;
+}
+
+function formatQtyUnit(qty: number, unit?: string): string {
+  if (unit === "kg") return `${qty} kg`;
+  return qty === 1 ? "1 pc" : `${qty} pcs`;
 }
 
 interface BundlesTabProps {
@@ -143,7 +149,7 @@ export default function BundlesTab({
     if (idx === -1 && delta > 0) {
       updateItemsAndSyncPrice([
         ...bItems,
-        { title: prod.title, qty: 1, unitPrice: prod.price, image: prod.image },
+        { title: prod.title, qty: 1, unitPrice: prod.price, unit: prod.unit || "pcs", image: prod.image },
       ]);
       return;
     }
@@ -498,8 +504,30 @@ export default function BundlesTab({
                       }}
                     >
                       <span style={{ fontWeight: 600, color: "#111827", flex: 1 }}>
-                        {it.title} <span style={{ color: "#0e8a60" }}>×{it.qty}</span>
+                        {it.title}{" "}
+                        <span style={{ color: "#0e8a60" }}>({formatQtyUnit(it.qty, it.unit)})</span>
                       </span>
+                      <button
+                        type="button"
+                        title="Switch kg / pcs"
+                        onClick={() => {
+                          const next = [...bItems];
+                          next[idx] = { ...it, unit: it.unit === "kg" ? "pcs" : "kg" };
+                          setBItems(next);
+                        }}
+                        style={{
+                          border: "1px solid #d1d5db",
+                          background: "#ffffff",
+                          color: "#374151",
+                          borderRadius: "5px",
+                          padding: "2px 6px",
+                          fontSize: "11px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {it.unit === "kg" ? "kg" : "pcs"}
+                      </button>
                       <span style={{ color: "#4b5563", fontWeight: 600 }}>
                         ${(it.qty * it.unitPrice).toFixed(2)}
                       </span>
@@ -697,7 +725,7 @@ export default function BundlesTab({
                 const saveAmt = Math.max(0, b.regular_price - displayPrice);
                 const previewItems = b.items
                   .slice(0, 3)
-                  .map((it) => `${it.title} (×${it.qty})`)
+                  .map((it) => `${it.title} (${formatQtyUnit(it.qty, it.unit)})`)
                   .join(", ");
                 const moreCount = Math.max(0, b.items.length - 3);
 

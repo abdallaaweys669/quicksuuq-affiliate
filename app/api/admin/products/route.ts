@@ -36,11 +36,15 @@ export async function GET(request: NextRequest) {
       .filter((p: any) => String(p.product_type || "").toLowerCase() !== "bundle")
       .map((p: any) => {
         const firstVariant = Array.isArray(p.variants) ? p.variants[0] : null;
+        const weightUnit = String(firstVariant?.weight_unit || "").toLowerCase();
+        const grams = Number(firstVariant?.grams || 0);
+        const unit = weightUnit === "kg" || grams >= 1000 ? "kg" : "pcs";
         return {
           id: String(p.id),
           variantId: firstVariant ? String(firstVariant.id) : "",
           title: String(p.title || ""),
           price: Number(firstVariant?.price || 0),
+          unit,
           image: p.image?.src || (Array.isArray(p.images) && p.images[0]?.src) || null,
         };
       })

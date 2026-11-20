@@ -4,6 +4,7 @@ export interface BundleItem {
   title: string;
   qty: number;
   unitPrice: number;
+  unit?: "kg" | "pcs";
   image?: string | null;
 }
 
@@ -76,16 +77,16 @@ const REAL_TEST_SETS: Array<{
     stock: 40,
     sold_count: 6,
     items: [
-      { title: "Yaanyo Tomato", qty: 1, unitPrice: 1.0 },
-      { title: "Basal Cadey - Onion", qty: 1, unitPrice: 1.25 },
-      { title: "Basal Gaduud", qty: 1, unitPrice: 1.0 },
-      { title: "Baradho-Potato", qty: 1, unitPrice: 1.35 },
-      { title: "kaarooto - Carrot", qty: 1, unitPrice: 0.9 },
-      { title: "Barbarooni - Bell pepper", qty: 1, unitPrice: 0.83 },
-      { title: "Qajaar Cucumber", qty: 1, unitPrice: 0.9 },
-      { title: "Kabsar-Parsley", qty: 1, unitPrice: 1.75 },
-      { title: "Toon Garlic", qty: 1, unitPrice: 2.4 },
-      { title: "Liin dhanaan-Lemon", qty: 1, unitPrice: 0.65 },
+      { title: "Yaanyo Tomato", qty: 1, unitPrice: 1.0, unit: "kg" },
+      { title: "Basal Cadey - Onion", qty: 1, unitPrice: 1.25, unit: "kg" },
+      { title: "Basal Gaduud", qty: 1, unitPrice: 1.0, unit: "kg" },
+      { title: "Baradho-Potato", qty: 1, unitPrice: 1.35, unit: "kg" },
+      { title: "kaarooto - Carrot", qty: 1, unitPrice: 0.9, unit: "kg" },
+      { title: "Barbarooni - Bell pepper", qty: 1, unitPrice: 0.83, unit: "kg" },
+      { title: "Qajaar Cucumber", qty: 1, unitPrice: 0.9, unit: "kg" },
+      { title: "Kabsar-Parsley", qty: 1, unitPrice: 1.75, unit: "kg" },
+      { title: "Toon Garlic", qty: 1, unitPrice: 2.4, unit: "kg" },
+      { title: "Liin dhanaan-Lemon", qty: 1, unitPrice: 0.65, unit: "kg" },
     ],
   },
   {
@@ -99,21 +100,21 @@ const REAL_TEST_SETS: Array<{
     stock: 30,
     sold_count: 4,
     items: [
-      { title: "Yaanyo Tomato", qty: 2, unitPrice: 1.0 },
-      { title: "Basal Cadey - Onion", qty: 2, unitPrice: 1.25 },
-      { title: "Baradho-Potato", qty: 2, unitPrice: 1.35 },
-      { title: "kaarooto - Carrot", qty: 2, unitPrice: 0.9 },
-      { title: "Barbarooni - Bell pepper", qty: 2, unitPrice: 0.83 },
-      { title: "Qajaar Cucumber", qty: 1, unitPrice: 0.9 },
-      { title: "Basal Gaduud", qty: 1, unitPrice: 1.0 },
-      { title: "Baadinjaan (Eggplant)", qty: 1, unitPrice: 1.65 },
-      { title: "Batati Macaan-Sweet potato", qty: 1, unitPrice: 0.9 },
-      { title: "Bocor - Pumpkin", qty: 1, unitPrice: 1.0 },
-      { title: "Kabsar-Parsley", qty: 1, unitPrice: 1.75 },
-      { title: "Toon Garlic", qty: 1, unitPrice: 2.4 },
-      { title: "Basbaas- Hot or chili pepper", qty: 1, unitPrice: 2.4 },
-      { title: "Liin dhanaan-Lemon", qty: 1, unitPrice: 0.65 },
-      { title: "moos", qty: 1, unitPrice: 1.0 },
+      { title: "Yaanyo Tomato", qty: 2, unitPrice: 1.0, unit: "kg" },
+      { title: "Basal Cadey - Onion", qty: 2, unitPrice: 1.25, unit: "kg" },
+      { title: "Baradho-Potato", qty: 2, unitPrice: 1.35, unit: "kg" },
+      { title: "kaarooto - Carrot", qty: 2, unitPrice: 0.9, unit: "kg" },
+      { title: "Barbarooni - Bell pepper", qty: 2, unitPrice: 0.83, unit: "kg" },
+      { title: "Qajaar Cucumber", qty: 1, unitPrice: 0.9, unit: "kg" },
+      { title: "Basal Gaduud", qty: 1, unitPrice: 1.0, unit: "kg" },
+      { title: "Baadinjaan (Eggplant)", qty: 1, unitPrice: 1.65, unit: "kg" },
+      { title: "Batati Macaan-Sweet potato", qty: 1, unitPrice: 0.9, unit: "kg" },
+      { title: "Bocor - Pumpkin", qty: 1, unitPrice: 1.0, unit: "pcs" },
+      { title: "Kabsar-Parsley", qty: 1, unitPrice: 1.75, unit: "kg" },
+      { title: "Toon Garlic", qty: 1, unitPrice: 2.4, unit: "kg" },
+      { title: "Basbaas- Hot or chili pepper", qty: 1, unitPrice: 2.4, unit: "kg" },
+      { title: "Liin dhanaan-Lemon", qty: 1, unitPrice: 0.65, unit: "kg" },
+      { title: "moos", qty: 1, unitPrice: 1.0, unit: "kg" },
     ],
   },
   {
@@ -127,23 +128,23 @@ const REAL_TEST_SETS: Array<{
     stock: 20,
     sold_count: 2,
     items: [
-      { title: "Yaanyo Tomato", qty: 3, unitPrice: 1.0 },
-      { title: "Basal Cadey - Onion", qty: 3, unitPrice: 1.25 },
-      { title: "Baradho-Potato", qty: 3, unitPrice: 1.35 },
-      { title: "kaarooto - Carrot", qty: 2, unitPrice: 0.9 },
-      { title: "Barbarooni - Bell pepper", qty: 2, unitPrice: 0.83 },
-      { title: "Qajaar Cucumber", qty: 2, unitPrice: 0.9 },
-      { title: "Basal Gaduud", qty: 2, unitPrice: 1.0 },
-      { title: "Baadinjaan (Eggplant)", qty: 2, unitPrice: 1.65 },
-      { title: "Baamiye - Okra", qty: 1, unitPrice: 2.5 },
-      { title: "Batati Macaan-Sweet potato", qty: 2, unitPrice: 0.9 },
-      { title: "Bocor - Pumpkin", qty: 1, unitPrice: 1.0 },
-      { title: "Kabsar-Parsley", qty: 1, unitPrice: 1.75 },
-      { title: "Toon Garlic", qty: 1, unitPrice: 2.4 },
-      { title: "moos", qty: 2, unitPrice: 1.0 },
-      { title: "Basbaas- Hot or chili pepper", qty: 1, unitPrice: 2.4 },
-      { title: "Liin dhanaan-Lemon", qty: 1, unitPrice: 0.65 },
-      { title: "Babaay - Papaya", qty: 1, unitPrice: 0.6 },
+      { title: "Yaanyo Tomato", qty: 3, unitPrice: 1.0, unit: "kg" },
+      { title: "Basal Cadey - Onion", qty: 3, unitPrice: 1.25, unit: "kg" },
+      { title: "Baradho-Potato", qty: 3, unitPrice: 1.35, unit: "kg" },
+      { title: "kaarooto - Carrot", qty: 2, unitPrice: 0.9, unit: "kg" },
+      { title: "Barbarooni - Bell pepper", qty: 2, unitPrice: 0.83, unit: "kg" },
+      { title: "Qajaar Cucumber", qty: 2, unitPrice: 0.9, unit: "kg" },
+      { title: "Basal Gaduud", qty: 2, unitPrice: 1.0, unit: "kg" },
+      { title: "Baadinjaan (Eggplant)", qty: 2, unitPrice: 1.65, unit: "kg" },
+      { title: "Baamiye - Okra", qty: 1, unitPrice: 2.5, unit: "kg" },
+      { title: "Batati Macaan-Sweet potato", qty: 2, unitPrice: 0.9, unit: "kg" },
+      { title: "Bocor - Pumpkin", qty: 1, unitPrice: 1.0, unit: "pcs" },
+      { title: "Kabsar-Parsley", qty: 1, unitPrice: 1.75, unit: "kg" },
+      { title: "Toon Garlic", qty: 1, unitPrice: 2.4, unit: "kg" },
+      { title: "moos", qty: 2, unitPrice: 1.0, unit: "kg" },
+      { title: "Basbaas- Hot or chili pepper", qty: 1, unitPrice: 2.4, unit: "kg" },
+      { title: "Liin dhanaan-Lemon", qty: 1, unitPrice: 0.65, unit: "kg" },
+      { title: "Babaay - Papaya", qty: 1, unitPrice: 0.6, unit: "pcs" },
     ],
   },
 ];
@@ -200,12 +201,12 @@ export async function ensurePromotionsTables(): Promise<void> {
   await query(`ALTER TABLE public.promotions DROP CONSTRAINT IF EXISTS promotions_rule_type_check`).catch(() => {});
 
   const bundleCount = await query<{ n: number }>("SELECT count(*)::int AS n FROM public.bundles");
-  const legacyCheck = await query<{ id: string; description: string }>(
-    `SELECT id, description FROM public.bundles WHERE id IN ('bnd_xirmada_set_a', 'bnd_xirmada_set_b', 'bnd_xirmada_set_c')`
+  const legacyCheck = await query<{ id: string; description: string; items_json: string }>(
+    `SELECT id, description, items_json FROM public.bundles WHERE id IN ('bnd_xirmada_set_a', 'bnd_xirmada_set_b', 'bnd_xirmada_set_c')`
   );
-  const needsDescBackfill = legacyCheck.rows.some((r) => !r.description);
+  const needsUnitOrDescBackfill = legacyCheck.rows.some((r) => !r.description || !r.items_json.includes('"unit"'));
 
-  if (!bundleCount.rows[0]?.n || needsDescBackfill) {
+  if (!bundleCount.rows[0]?.n || needsUnitOrDescBackfill) {
     for (const s of REAL_TEST_SETS) {
       await query(
         `INSERT INTO public.bundles (id, title, description, slug, poster_url, items_json, regular_price, bundle_price, stock, sold_count, commission_type, commission_value, is_active)
@@ -213,6 +214,7 @@ export async function ensurePromotionsTables(): Promise<void> {
          ON CONFLICT (id) DO UPDATE SET
            title = EXCLUDED.title,
            description = CASE WHEN public.bundles.description = '' THEN EXCLUDED.description ELSE public.bundles.description END,
+           items_json = EXCLUDED.items_json,
            updated_at = NOW()`,
         [
           s.id,
