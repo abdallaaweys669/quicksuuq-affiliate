@@ -1,19 +1,23 @@
-﻿import { query } from "@/lib/db";
+import { query } from "@/lib/db";
 
 export interface BundleItem {
   title: string;
   qty: number;
   unitPrice: number;
+  image?: string | null;
 }
 
 export interface BundleRecord {
   id: string;
   title: string;
+  description: string;
   slug: string;
   poster_url: string | null;
   items: BundleItem[];
   regular_price: number;
   bundle_price: number;
+  promo_price: number | null;
+  promo_ends_at: string | null;
   stock: number;
   sold_count: number;
   commission_type: "DEFAULT" | "PERCENT" | "FIXED";
@@ -26,11 +30,12 @@ export interface BundleRecord {
 export interface PromotionRecord {
   id: string;
   title: string;
-  rule_type: "FIRST_N_CUSTOMERS" | "MIN_ORDER_AMOUNT";
+  rule_type: "FIRST_N_CUSTOMERS" | "MIN_ORDER_AMOUNT" | "PERCENT_OFF";
   max_claims: number | null;
   claimed_count: number;
   min_order_usd: number | null;
-  reward_type: "FREE_DELIVERY";
+  discount_percent: number | null;
+  reward_type: "FREE_DELIVERY" | "PERCENT_OFF";
   starts_at: string | null;
   ends_at: string | null;
   is_active: boolean;
@@ -51,6 +56,7 @@ export function slugifyBundle(title: string): string {
 const REAL_TEST_SETS: Array<{
   id: string;
   title: string;
+  description: string;
   slug: string;
   poster_url: string;
   regular_price: number;
@@ -61,7 +67,8 @@ const REAL_TEST_SETS: Array<{
 }> = [
   {
     id: "bnd_xirmada_set_a",
-    title: "Xirmada Qudaarta - Set A (1-2 qof · 10 kg)",
+    title: "Xirmada Qudaarta - Set A",
+    description: "Ku filan 1-2 qof · 1 isbuuc · ~10 kg fresh vegetables",
     slug: "xirmada-qudaarta-set-a",
     poster_url: "/bundles/set-a.jpg",
     regular_price: 12.03,
@@ -83,7 +90,8 @@ const REAL_TEST_SETS: Array<{
   },
   {
     id: "bnd_xirmada_set_b",
-    title: "Xirmada Qudaarta - Set B (3-4 qof · 20 kg)",
+    title: "Xirmada Qudaarta - Set B",
+    description: "Ku filan 3-4 qof · 1 isbuuc · ~20 kg family pack",
     slug: "xirmada-qudaarta-set-b",
     poster_url: "/bundles/set-b.jpg",
     regular_price: 24.31,
@@ -110,7 +118,8 @@ const REAL_TEST_SETS: Array<{
   },
   {
     id: "bnd_xirmada_set_c",
-    title: "Xirmada Qudaarta - Set C (5-8 qof · 30 kg)",
+    title: "Xirmada Qudaarta - Set C",
+    description: "Ku filan 5-8 qof · 1 isbuuc · ~30 kg large family pack",
     slug: "xirmada-qudaarta-set-c",
     poster_url: "/bundles/set-c.jpg",
     regular_price: 36.46,
@@ -146,11 +155,14 @@ export async function ensurePromotionsTables(): Promise<void> {
     CREATE TABLE IF NOT EXISTS public.bundles (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
       slug TEXT NOT NULL UNIQUE,
       poster_url TEXT,
       items_json TEXT NOT NULL DEFAULT '[]',
       regular_price NUMERIC(10,2) NOT NULL DEFAULT 0,
       bundle_price NUMERIC(10,2) NOT NULL DEFAULT 0,
+      promo_price NUMERIC(10,2),
+      promo_ends_at TIMESTAMPTZ,
       stock INTEGER NOT NULL DEFAULT 0,
       sold_count INTEGER NOT NULL DEFAULT 0,
       commission_type TEXT NOT NULL DEFAULT 'DEFAULT',
@@ -162,14 +174,19 @@ export async function ensurePromotionsTables(): Promise<void> {
     );
   `);
 
+  await query(`ALTER TABLE public.bundles ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''`);
+  await query(`ALTER TABLE public.bundles ADD COLUMN IF NOT EXISTS promo_price NUMERIC(10,2)`);
+  await query(`ALTER TABLE public.bundles ADD COLUMN IF NOT EXISTS promo_ends_at TIMESTAMPTZ`);
+
   await query(`
     CREATE TABLE IF NOT EXISTS public.promotions (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
-      rule_type TEXT NOT NULL CHECK (rule_type IN ('FIRST_N_CUSTOMERS', 'MIN_ORDER_AMOUNT')),
+      rule_type TEXT NOT NULL,
       max_claims INTEGER,
       claimed_count INTEGER NOT NULL DEFAULT 0,
       min_order_usd NUMERIC(10,2),
+      discount_percent NUMERIC(5,2),
       reward_type TEXT NOT NULL DEFAULT 'FREE_DELIVERY',
       starts_at TIMESTAMPTZ,
       ends_at TIMESTAMPTZ,
@@ -178,27 +195,29 @@ export async function ensurePromotionsTables(): Promise<void> {
     );
   `);
 
-  // Ensure starter Set A, B, C use real Shopify store products and min 1 kg
-  const legacyCheck = await query<{ id: string; items_json: string }>(
-    `SELECT id, items_json FROM public.bundles WHERE id IN ('bnd_xirmada_set_a', 'bnd_xirmada_set_b', 'bnd_xirmada_set_c')`
-  );
-  const needsUpgrade = legacyCheck.rows.some((r) => r.items_json.includes("500 g") || r.items_json.includes("500g"));
+  await query(`ALTER TABLE public.promotions ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5,2)`);
+  // Relax old check constraint if present so PERCENT_OFF is also allowed
+  await query(`ALTER TABLE public.promotions DROP CONSTRAINT IF EXISTS promotions_rule_type_check`).catch(() => {});
 
   const bundleCount = await query<{ n: number }>("SELECT count(*)::int AS n FROM public.bundles");
-  if (!bundleCount.rows[0]?.n || needsUpgrade) {
+  const legacyCheck = await query<{ id: string; description: string }>(
+    `SELECT id, description FROM public.bundles WHERE id IN ('bnd_xirmada_set_a', 'bnd_xirmada_set_b', 'bnd_xirmada_set_c')`
+  );
+  const needsDescBackfill = legacyCheck.rows.some((r) => !r.description);
+
+  if (!bundleCount.rows[0]?.n || needsDescBackfill) {
     for (const s of REAL_TEST_SETS) {
       await query(
-        `INSERT INTO public.bundles (id, title, slug, poster_url, items_json, regular_price, bundle_price, stock, sold_count, commission_type, commission_value, is_active)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'DEFAULT', 0, TRUE)
+        `INSERT INTO public.bundles (id, title, description, slug, poster_url, items_json, regular_price, bundle_price, stock, sold_count, commission_type, commission_value, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'DEFAULT', 0, TRUE)
          ON CONFLICT (id) DO UPDATE SET
            title = EXCLUDED.title,
-           items_json = EXCLUDED.items_json,
-           regular_price = EXCLUDED.regular_price,
-           bundle_price = EXCLUDED.bundle_price,
+           description = CASE WHEN public.bundles.description = '' THEN EXCLUDED.description ELSE public.bundles.description END,
            updated_at = NOW()`,
         [
           s.id,
           s.title,
+          s.description,
           s.slug,
           s.poster_url,
           JSON.stringify(s.items),
@@ -215,14 +234,15 @@ export async function ensurePromotionsTables(): Promise<void> {
   if (!promoCount.rows[0]?.n) {
     const endsAt = new Date(Date.now() + 7 * 86400_000).toISOString();
     await query(
-      `INSERT INTO public.promotions (id, title, rule_type, max_claims, claimed_count, min_order_usd, reward_type, starts_at, ends_at, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, TRUE)`,
+      `INSERT INTO public.promotions (id, title, rule_type, max_claims, claimed_count, min_order_usd, discount_percent, reward_type, starts_at, ends_at, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, TRUE)`,
       [
         "prm_first_20_free_delivery",
         "First 20 Customers Free Delivery",
         "FIRST_N_CUSTOMERS",
         20,
         6,
+        null,
         null,
         "FREE_DELIVERY",
         endsAt,
@@ -244,11 +264,14 @@ export function mapBundleRow(row: Record<string, unknown>): BundleRecord {
   return {
     id: String(row.id),
     title: String(row.title),
+    description: String(row.description || ""),
     slug: String(row.slug),
     poster_url: row.poster_url ? String(row.poster_url) : null,
     items,
     regular_price: Number(row.regular_price || 0),
     bundle_price: Number(row.bundle_price || 0),
+    promo_price: row.promo_price != null ? Number(row.promo_price) : null,
+    promo_ends_at: row.promo_ends_at ? String(row.promo_ends_at) : null,
     stock: Number(row.stock || 0),
     sold_count: Number(row.sold_count || 0),
     commission_type: String(row.commission_type || "DEFAULT") as BundleRecord["commission_type"],
@@ -267,7 +290,8 @@ export function mapPromotionRow(row: Record<string, unknown>): PromotionRecord {
     max_claims: row.max_claims != null ? Number(row.max_claims) : null,
     claimed_count: Number(row.claimed_count || 0),
     min_order_usd: row.min_order_usd != null ? Number(row.min_order_usd) : null,
-    reward_type: "FREE_DELIVERY",
+    discount_percent: row.discount_percent != null ? Number(row.discount_percent) : null,
+    reward_type: (row.reward_type === "PERCENT_OFF" ? "PERCENT_OFF" : "FREE_DELIVERY"),
     starts_at: row.starts_at ? String(row.starts_at) : null,
     ends_at: row.ends_at ? String(row.ends_at) : null,
     is_active: Boolean(row.is_active),

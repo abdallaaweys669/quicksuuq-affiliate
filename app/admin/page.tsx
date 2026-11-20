@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import BundlesTab from "./BundlesTab";
 import PromotionsTab from "./PromotionsTab";
 import type { BundleRecord, PromotionRecord } from "@/lib/promotions";
 
@@ -183,7 +184,7 @@ export default function AdminDashboardPage() {
 
   // Tabs
   const [activeTab, setActiveTab] = useState<
-    "orders" | "commissions" | "salespeople" | "payouts" | "delivery" | "storefront" | "promotions" | "whatsapp"
+    "orders" | "commissions" | "salespeople" | "payouts" | "delivery" | "storefront" | "bundles" | "promotions" | "whatsapp"
   >("commissions");
   const [bundlesList, setBundlesList] = useState<BundleRecord[]>([]);
   const [promotionsList, setPromotionsList] = useState<PromotionRecord[]>([]);
@@ -1260,7 +1261,8 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                 {isAffiliateSection && "Affiliate & Partner Network"}
                 {activeTab === "delivery" && "Delivery & Logistics"}
                 {activeTab === "storefront" && "Website Content (CMS)"}
-                {activeTab === "promotions" && "Bundles & Promotions"}
+                {activeTab === "bundles" && "Bundles (Xirmooyin)"}
+                {activeTab === "promotions" && "Promotions & Deals"}
                 {activeTab === "whatsapp" && "WhatsApp Marketing & Broadcast"}
               </h2>
               <div className="rep-meta">
@@ -1269,7 +1271,8 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                   {isAffiliateSection && "Sales team commissions, customer tracking, and EVC Plus batch payouts"}
                   {activeTab === "delivery" && "Mogadishu delivery zones, vehicle weight capacities, and driver registry"}
                   {activeTab === "storefront" && "Hero Slider, Featured Categories, Promo Banners, and Popular Products"}
-                  {activeTab === "promotions" && "Create value bundles and time-limited Free Delivery deals for quicksuuq-test"}
+                  {activeTab === "bundles" && "Build combo packs from real Shopify products (works with or without posters)"}
+                  {activeTab === "promotions" && "Time-limited Free Delivery and % Off campaigns"}
                   {activeTab === "whatsapp" && "Import contacts, create promotional broadcasts, and send via WhatsApp queue"}
                 </span>
               </div>
@@ -1437,7 +1440,8 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                   { id: "payouts", label: `Payouts (${payouts.length})` },
                   { id: "delivery", label: `Delivery (${deliveryAreas.length})` },
                   { id: "storefront", label: "Storefront" },
-                  { id: "promotions", label: `Promotions (${bundlesList.length + promotionsList.length})` },
+                  { id: "bundles", label: `Bundles (${bundlesList.length})` },
+                  { id: "promotions", label: `Promotions (${promotionsList.length})` },
                   { id: "whatsapp", label: waParsedNumbers.length > 0 ? `Broadcast (${waParsedNumbers.length})` : "Broadcast" },
                 ] as const
               ).map((tab) => {
@@ -3706,10 +3710,19 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
           </div>
         )}
 
-        {/* Promotions & Bundles Tab */}
+        {/* Bundles Tab */}
+        {activeTab === "bundles" && (
+          <BundlesTab
+            bundles={bundlesList}
+            adminFetch={adminFetch}
+            onRefresh={refreshPromotions}
+            onFeedback={showFeedback}
+          />
+        )}
+
+        {/* Promotions Tab */}
         {activeTab === "promotions" && (
           <PromotionsTab
-            bundles={bundlesList}
             promotions={promotionsList}
             adminFetch={adminFetch}
             onRefresh={refreshPromotions}
