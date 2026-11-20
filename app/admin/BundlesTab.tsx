@@ -636,14 +636,14 @@ export default function BundlesTab({
     );
   }
 
-  // BUNDLES LIST VIEW
+  // BUNDLES LIST VIEW (Matches Commissions / Orders Shopify Polaris table style)
   const visibleBundles = bundles.filter(
     (b) => !searchTerm.trim() || b.title.toLowerCase().includes(searchTerm.trim().toLowerCase())
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "12px 0 24px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+    <div style={{ padding: "8px 0 24px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "14px" }}>
         <input
           type="search"
           placeholder="Search bundles..."
@@ -653,178 +653,129 @@ export default function BundlesTab({
         />
         <button
           type="button"
-          className="btn-primary"
-          style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: "8px" }}
           onClick={openNewBuilder}
+          style={{
+            whiteSpace: "nowrap",
+            padding: "8px 14px",
+            borderRadius: "8px",
+            border: "1px solid #111827",
+            background: "#1f2937",
+            color: "#ffffff",
+            fontSize: "13px",
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
         >
           + New Bundle
         </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))", gap: "16px" }}>
-        {visibleBundles.length === 0 && (
-          <div className="empty-state" style={{ gridColumn: "1 / -1" }}>
-            No bundles found. Click <strong>+ New Bundle</strong> to create one.
-          </div>
-        )}
+      {visibleBundles.length === 0 ? (
+        <div className="empty-state">
+          No bundles found. Click <strong>+ New Bundle</strong> to create one.
+        </div>
+      ) : (
+        <div className="table-responsive">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Bundle</th>
+                <th>Items Included</th>
+                <th>Price</th>
+                <th>Stock / Sold</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleBundles.map((b) => {
+                const hasValidFlash =
+                  b.promo_price != null &&
+                  b.promo_price > 0 &&
+                  (!b.promo_ends_at || new Date(b.promo_ends_at).getTime() > Date.now());
+                const displayPrice = hasValidFlash && b.promo_price ? b.promo_price : b.bundle_price;
+                const saveAmt = Math.max(0, b.regular_price - displayPrice);
+                const previewItems = b.items
+                  .slice(0, 3)
+                  .map((it) => `${it.title} (×${it.qty})`)
+                  .join(", ");
+                const moreCount = Math.max(0, b.items.length - 3);
 
-        {visibleBundles.map((b) => {
-          const hasValidFlash =
-            b.promo_price != null &&
-            b.promo_price > 0 &&
-            (!b.promo_ends_at || new Date(b.promo_ends_at).getTime() > Date.now());
-          const displayPrice = hasValidFlash && b.promo_price ? b.promo_price : b.bundle_price;
-          const saveAmt = Math.max(0, b.regular_price - displayPrice);
-
-          return (
-            <div
-              key={b.id}
-              style={{
-                background: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-              }}
-            >
-              <div>
-                {b.poster_url ? (
-                  <img
-                    src={b.poster_url}
-                    alt={b.title}
-                    style={{ width: "100%", height: "220px", objectFit: "contain", background: "#eef6f0", display: "block" }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      padding: "16px",
-                      background: "linear-gradient(135deg, #0e8a60 0%, #16b981 100%)",
-                      color: "#ffffff",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: "11px", fontWeight: 700, opacity: 0.9, textTransform: "uppercase" }}>
-                        QuickSuuq Bundle
+                return (
+                  <tr key={b.id}>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        {b.poster_url ? (
+                          <img
+                            src={b.poster_url}
+                            alt=""
+                            style={{ width: "38px", height: "38px", borderRadius: "6px", objectFit: "cover", border: "1px solid #e5e7eb", flexShrink: 0 }}
+                          />
+                        ) : null}
+                        <div>
+                          <div style={{ fontWeight: 600, color: "#111827" }}>{b.title}</div>
+                          {b.description && (
+                            <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>{b.description}</div>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ fontSize: "17px", fontWeight: 800 }}>{b.title}</div>
-                    </div>
-                    {saveAmt > 0 && (
-                      <span style={{ background: "#ffffff", color: "#0e8a60", padding: "4px 10px", borderRadius: "999px", fontSize: "12px", fontWeight: 800 }}>
-                        Save ${saveAmt.toFixed(2)}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                <div style={{ padding: "14px 16px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px", marginBottom: "6px" }}>
-                    <h3 style={{ margin: 0, fontSize: "15.5px", fontWeight: 700, color: "#111827" }}>{b.title}</h3>
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        padding: "3px 8px",
-                        borderRadius: "999px",
-                        background: b.is_active ? "#ecfdf5" : "#f3f4f6",
-                        color: b.is_active ? "#0e8a60" : "#6b7280",
-                        border: b.is_active ? "1px solid #a7f3d0" : "1px solid #e5e7eb",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {b.is_active ? "Visible" : "Hidden"}
-                    </span>
-                  </div>
-
-                  {/* Exact products & quantities */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "10px" }}>
-                    {b.items.slice(0, 6).map((it, idx) => (
+                    </td>
+                    <td style={{ maxWidth: "280px", fontSize: "12.5px", color: "#374151" }}>
+                      {previewItems}
+                      {moreCount > 0 ? ` +${moreCount} more` : ""}
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 700, color: "#111827" }}>${displayPrice.toFixed(2)}</div>
+                      {b.regular_price > displayPrice && (
+                        <div style={{ fontSize: "11.5px", color: "#6b7280" }}>
+                          <span style={{ textDecoration: "line-through" }}>${b.regular_price.toFixed(2)}</span> · Save ${saveAmt.toFixed(2)}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ fontSize: "12.5px", color: "#374151" }}>
+                      {b.stock} left · {b.sold_count} sold
+                    </td>
+                    <td>
                       <span
-                        key={idx}
-                        style={{
-                          fontSize: "11.5px",
-                          background: "#f3f4f6",
-                          color: "#374151",
-                          padding: "3px 8px",
-                          borderRadius: "6px",
-                          fontWeight: 500,
-                        }}
+                        className={`status-pill ${b.is_active ? "status-approved" : "status-pending"}`}
+                        style={{ fontSize: "11px", fontWeight: 700 }}
                       >
-                        {it.title} <strong>×{it.qty}</strong>
+                        {b.is_active ? "VISIBLE" : "HIDDEN"}
                       </span>
-                    ))}
-                    {b.items.length > 6 && (
-                      <span style={{ fontSize: "11.5px", color: "#0e8a60", fontWeight: 700, padding: "3px 4px" }}>
-                        +{b.items.length - 6} more
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Short description below products */}
-                  {b.description && (
-                    <p style={{ margin: "0 0 10px", fontSize: "12.5px", color: "#4b5563", lineHeight: 1.4 }}>
-                      {b.description}
-                    </p>
-                  )}
-
-                  <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: "20px", fontWeight: 800, color: "#111827" }}>
-                      ${displayPrice.toFixed(2)}
-                    </span>
-                    {b.regular_price > displayPrice && (
-                      <>
-                        <span style={{ fontSize: "13px", color: "#9ca3af", textDecoration: "line-through" }}>
-                          ${b.regular_price.toFixed(2)}
-                        </span>
-                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#0e8a60", background: "#ecfdf5", padding: "2px 6px", borderRadius: "6px" }}>
-                          Save ${saveAmt.toFixed(2)}
-                        </span>
-                      </>
-                    )}
-                    {hasValidFlash && (
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "#b45309", background: "#fef3c7", padding: "2px 6px", borderRadius: "6px" }}>
-                        Limited Offer
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={{ fontSize: "12px", color: "#6b7280" }}>
-                    Stock: <strong>{b.stock}</strong> · Sold: <strong>{b.sold_count}</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  padding: "10px 16px",
-                  borderTop: "1px solid #f3f4f6",
-                  background: "#f9fafb",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
-              >
-                <button type="button" className="btn-small" onClick={() => handleToggle(b)}>
-                  {b.is_active ? "Hide" : "Show"}
-                </button>
-                <div style={{ display: "flex", gap: "6px" }}>
-                  <button type="button" className="btn-small" onClick={() => openEditBuilder(b)}>
-                    Edit
-                  </button>
-                  <button type="button" className="btn-small" style={{ color: "#dc2626" }} onClick={() => handleDelete(b)}>
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                        <button
+                          type="button"
+                          onClick={() => openEditBuilder(b)}
+                          style={{
+                            padding: "5px 11px",
+                            borderRadius: "6px",
+                            border: "1px solid #111827",
+                            background: "#1f2937",
+                            color: "#ffffff",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button type="button" className="btn-small" onClick={() => handleToggle(b)}>
+                          {b.is_active ? "Hide" : "Show"}
+                        </button>
+                        <button type="button" className="btn-small" style={{ color: "#dc2626" }} onClick={() => handleDelete(b)}>
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

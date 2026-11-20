@@ -108,8 +108,8 @@ export default function PromotionsTab({
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "12px 0 24px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+    <div style={{ padding: "8px 0 24px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "14px" }}>
         <input
           type="search"
           placeholder="Search promotions..."
@@ -119,101 +119,89 @@ export default function PromotionsTab({
         />
         <button
           type="button"
-          className="btn-primary"
-          style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: "8px" }}
           onClick={() => setShowDealModal(true)}
+          style={{
+            whiteSpace: "nowrap",
+            padding: "8px 14px",
+            borderRadius: "8px",
+            border: "1px solid #111827",
+            background: "#1f2937",
+            color: "#ffffff",
+            fontSize: "13px",
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
         >
           + New Promotion
         </button>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-        {visiblePromos.length === 0 && (
-          <div className="empty-state">
-            No promotions found. Click <strong>+ New Promotion</strong> to create one.
-          </div>
-        )}
+      {visiblePromos.length === 0 ? (
+        <div className="empty-state">
+          No promotions found. Click <strong>+ New Promotion</strong> to create one.
+        </div>
+      ) : (
+        <div className="table-responsive">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Promotion</th>
+                <th>Rule</th>
+                <th>Usage</th>
+                <th>Ends At</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visiblePromos.map((p) => {
+                const isFirstN = p.rule_type === "FIRST_N_CUSTOMERS";
+                const isPct = p.rule_type === "PERCENT_OFF";
+                const max = p.max_claims || 20;
+                const spotsLeft = isFirstN ? Math.max(0, max - p.claimed_count) : null;
+                const expired = p.ends_at ? new Date(p.ends_at).getTime() < Date.now() : false;
 
-        {visiblePromos.map((p) => {
-          const isFirstN = p.rule_type === "FIRST_N_CUSTOMERS";
-          const isPct = p.rule_type === "PERCENT_OFF";
-          const max = p.max_claims || 20;
-          const pct = isFirstN ? Math.min(100, Math.round((p.claimed_count / max) * 100)) : 0;
-          const spotsLeft = isFirstN ? Math.max(0, max - p.claimed_count) : null;
-          const expired = p.ends_at ? new Date(p.ends_at).getTime() < Date.now() : false;
-
-          return (
-            <div
-              key={p.id}
-              style={{
-                background: "#ffffff",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "16px 18px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "10px",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", flexWrap: "wrap" }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#111827" }}>{p.title}</h3>
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        padding: "3px 8px",
-                        borderRadius: "999px",
-                        background: p.is_active && !expired ? "#ecfdf5" : "#f3f4f6",
-                        color: p.is_active && !expired ? "#0e8a60" : "#6b7280",
-                      }}
-                    >
-                      {expired ? "Expired" : p.is_active ? "Active" : "Paused"}
-                    </span>
-                  </div>
-                  <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#6b7280" }}>
-                    {isFirstN
-                      ? `Free Delivery for first ${max} customers`
-                      : isPct
-                      ? `${Number(p.discount_percent || 20)}% Off storewide promo`
-                      : `Free Delivery on orders $${Number(p.min_order_usd || 35).toFixed(2)}+`}
-                    {p.ends_at ? ` · Ends ${new Date(p.ends_at).toLocaleString()}` : " · No time limit"}
-                  </p>
-                </div>
-
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <button type="button" className="btn-small" onClick={() => handleToggleDeal(p)}>
-                    {p.is_active ? "Turn Off" : "Turn On"}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-small"
-                    style={{ color: "#dc2626" }}
-                    onClick={() => handleDeleteDeal(p)}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-
-              {isFirstN && (
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#4b5563", marginBottom: "5px" }}>
-                    <span>
-                      <strong>{p.claimed_count}</strong> / {max} claimed
-                    </span>
-                    <span style={{ color: "#0e8a60", fontWeight: 600 }}>{spotsLeft} spots left</span>
-                  </div>
-                  <div style={{ width: "100%", height: "8px", background: "#f3f4f6", borderRadius: "999px", overflow: "hidden" }}>
-                    <div style={{ width: `${pct}%`, height: "100%", background: "#16b981", borderRadius: "999px" }} />
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                return (
+                  <tr key={p.id}>
+                    <td style={{ fontWeight: 600, color: "#111827" }}>{p.title}</td>
+                    <td style={{ fontSize: "12.5px", color: "#374151" }}>
+                      {isFirstN
+                        ? `First ${max} customers · Free Delivery`
+                        : isPct
+                        ? `${Number(p.discount_percent || 20)}% Off`
+                        : `Orders $${Number(p.min_order_usd || 35).toFixed(2)}+ · Free Delivery`}
+                    </td>
+                    <td style={{ fontSize: "12.5px", color: "#374151" }}>
+                      {isFirstN ? `${p.claimed_count} / ${max} (${spotsLeft} left)` : "Unlimited"}
+                    </td>
+                    <td style={{ fontSize: "12.5px", color: "#6b7280" }}>
+                      {p.ends_at ? new Date(p.ends_at).toLocaleDateString() : "No limit"}
+                    </td>
+                    <td>
+                      <span
+                        className={`status-pill ${p.is_active && !expired ? "status-approved" : "status-pending"}`}
+                        style={{ fontSize: "11px", fontWeight: 700 }}
+                      >
+                        {expired ? "EXPIRED" : p.is_active ? "ACTIVE" : "PAUSED"}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        <button type="button" className="btn-small" onClick={() => handleToggleDeal(p)}>
+                          {p.is_active ? "Pause" : "Activate"}
+                        </button>
+                        <button type="button" className="btn-small" style={{ color: "#dc2626" }} onClick={() => handleDeleteDeal(p)}>
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {showDealModal && (
         <div className="modal-backdrop">
