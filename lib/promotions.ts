@@ -4,7 +4,7 @@ export interface BundleItem {
   title: string;
   qty: number;
   unitPrice: number;
-  unit?: "kg" | "pcs";
+  unit?: "kg" | "pcs" | "liter";
   image?: string | null;
 }
 

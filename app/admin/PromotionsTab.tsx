@@ -108,7 +108,7 @@ export default function PromotionsTab({
   );
 
   return (
-    <div style={{ padding: "8px 0 24px" }}>
+    <div style={{ padding: "14px 18px 26px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "14px" }}>
         <input
           type="search"
@@ -293,7 +293,7 @@ export default function PromotionsTab({
                 <button
                   type="submit"
                   className="btn-primary"
-                  style={{ padding: "9px 18px", borderRadius: "8px", background: "#16b981", borderColor: "#16b981" }}
+                  style={{ padding: "9px 18px", borderRadius: "8px", background: "#1f2937", borderColor: "#111827", color: "#ffffff" }}
                   disabled={saving}
                 >
                   {saving ? "Saving..." : "Create Promotion"}

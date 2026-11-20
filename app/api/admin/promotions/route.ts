@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
               title: String(it.title).trim(),
               qty: Math.max(1, Number(it.qty || 1)),
               unitPrice: Math.max(0, Number(it.unitPrice || 0)),
-              unit: it.unit === "kg" ? "kg" : "pcs",
+              unit: it.unit === "kg" ? "kg" : it.unit === "liter" ? "liter" : "pcs",
               image: it.image ? String(it.image) : null,
             }))
         : [];

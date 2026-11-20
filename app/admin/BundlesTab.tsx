@@ -8,13 +8,8 @@ interface StoreProduct {
   variantId: string;
   title: string;
   price: number;
-  unit?: "kg" | "pcs";
+  unit?: "kg" | "pcs" | "liter";
   image: string | null;
-}
-
-function formatQtyUnit(qty: number, unit?: string): string {
-  if (unit === "kg") return `${qty} kg`;
-  return qty === 1 ? "1 pc" : `${qty} pcs`;
 }
 
 interface BundlesTabProps {
@@ -22,6 +17,20 @@ interface BundlesTabProps {
   adminFetch: (url: string, init?: RequestInit) => Promise<Response>;
   onRefresh: () => Promise<void>;
   onFeedback: (msg: string) => void;
+}
+
+type UnitType = "kg" | "pcs" | "liter";
+
+function formatQtyUnit(qty: number, unit?: string): string {
+  if (unit === "kg") return `${qty} kg`;
+  if (unit === "liter") return `${qty} L`;
+  return qty === 1 ? "1 pc" : `${qty} pcs`;
+}
+
+function nextUnit(u?: string): UnitType {
+  if (u === "kg") return "pcs";
+  if (u === "pcs") return "liter";
+  return "kg";
 }
 
 const inputStyle: React.CSSProperties = {
@@ -43,13 +52,26 @@ const labelStyle: React.CSSProperties = {
   marginBottom: "5px",
 };
 
+const blackBtnStyle: React.CSSProperties = {
+  whiteSpace: "nowrap",
+  padding: "8px 15px",
+  borderRadius: "8px",
+  border: "1px solid #111827",
+  background: "#1f2937",
+  color: "#ffffff",
+  fontSize: "13px",
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
 export default function BundlesTab({
   bundles,
   adminFetch,
   onRefresh,
   onFeedback,
 }: BundlesTabProps) {
-  const [builderOpen, setBuilderOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -57,6 +79,7 @@ export default function BundlesTab({
   const [storeProducts, setStoreProducts] = useState<StoreProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productQuery, setProductQuery] = useState("");
+  const [unitFilter, setUnitFilter] = useState<"ALL" | UnitType>("ALL");
 
   // Bundle builder fields
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -65,6 +88,7 @@ export default function BundlesTab({
   const [bPoster, setBPoster] = useState("");
   const [bItems, setBItems] = useState<BundleItem[]>([]);
   const [bPrice, setBPrice] = useState("");
+  const [bDiscountPct, setBDiscountPct] = useState("");
   const [bPriceManual, setBPriceManual] = useState(false);
   const [bHasFlash, setBHasFlash] = useState(false);
   const [bPromoPrice, setBPromoPrice] = useState("");
@@ -92,13 +116,15 @@ export default function BundlesTab({
     }
   }
 
-  function openNewBuilder() {
+  function openNewModal() {
     setEditingId(null);
+    setStep(1);
     setBTitle("");
     setBDesc("");
     setBPoster("");
     setBItems([]);
     setBPrice("");
+    setBDiscountPct("");
     setBPriceManual(false);
     setBHasFlash(false);
     setBPromoPrice("");
@@ -106,17 +132,24 @@ export default function BundlesTab({
     setBStock("30");
     setBActive(true);
     setProductQuery("");
-    setBuilderOpen(true);
+    setUnitFilter("ALL");
+    setModalOpen(true);
     ensureProductsLoaded();
   }
 
-  function openEditBuilder(b: BundleRecord) {
+  function openEditModal(b: BundleRecord) {
     setEditingId(b.id);
+    setStep(1);
     setBTitle(b.title);
     setBDesc(b.description || "");
     setBPoster(b.poster_url || "");
     setBItems(b.items.length > 0 ? b.items : []);
     setBPrice(b.bundle_price.toFixed(2));
+    const pct =
+      b.regular_price > 0 && b.bundle_price < b.regular_price
+        ? Math.round(((b.regular_price - b.bundle_price) / b.regular_price) * 100)
+        : 0;
+    setBDiscountPct(pct > 0 ? String(pct) : "");
     setBPriceManual(true);
     setBHasFlash(Boolean(b.promo_price && b.promo_price > 0));
     setBPromoPrice(b.promo_price ? b.promo_price.toFixed(2) : "");
@@ -124,18 +157,23 @@ export default function BundlesTab({
     setBStock(String(b.stock));
     setBActive(b.is_active);
     setProductQuery("");
-    setBuilderOpen(true);
+    setUnitFilter("ALL");
+    setModalOpen(true);
     ensureProductsLoaded();
   }
 
   function updateItemsAndSyncPrice(nextItems: BundleItem[]) {
     setBItems(nextItems);
+    const nextTotal = nextItems.reduce(
+      (s, it) => s + (Number(it.qty) || 0) * (Number(it.unitPrice) || 0),
+      0
+    );
     if (!bPriceManual) {
-      const nextTotal = nextItems.reduce(
-        (s, it) => s + (Number(it.qty) || 0) * (Number(it.unitPrice) || 0),
-        0
-      );
       setBPrice(nextTotal > 0 ? nextTotal.toFixed(2) : "");
+      setBDiscountPct("");
+    } else if (nextTotal > 0 && bDiscountPct) {
+      const pct = Math.min(99, Math.max(0, Number(bDiscountPct) || 0));
+      setBPrice((nextTotal * (1 - pct / 100)).toFixed(2));
     }
   }
 
@@ -165,15 +203,33 @@ export default function BundlesTab({
     }
   }
 
-  function applyDiscountPercent(pct: number) {
-    if (regularTotal <= 0) return;
+  function handleDiscountPctChange(raw: string) {
     setBPriceManual(true);
-    setBPrice((regularTotal * (1 - pct / 100)).toFixed(2));
+    setBDiscountPct(raw);
+    const pct = Number(raw);
+    if (regularTotal > 0 && raw !== "" && !Number.isNaN(pct)) {
+      const clamped = Math.min(99, Math.max(0, pct));
+      setBPrice((regularTotal * (1 - clamped / 100)).toFixed(2));
+    }
   }
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    if (!bTitle.trim()) return;
+  function handleBundlePriceChange(raw: string) {
+    setBPriceManual(true);
+    setBPrice(raw);
+    const price = Number(raw);
+    if (regularTotal > 0 && raw !== "" && !Number.isNaN(price) && price <= regularTotal) {
+      const pct = Math.round(((regularTotal - price) / regularTotal) * 100);
+      setBDiscountPct(pct > 0 ? String(pct) : "");
+    } else {
+      setBDiscountPct("");
+    }
+  }
+
+  async function handleSave() {
+    if (!bTitle.trim()) {
+      setStep(1);
+      return;
+    }
     setSaving(true);
     try {
       const cleanItems = bItems.filter((it) => it.title.trim());
@@ -201,7 +257,7 @@ export default function BundlesTab({
         alert(d.error || "Failed to save bundle");
         return;
       }
-      setBuilderOpen(false);
+      setModalOpen(false);
       await onRefresh();
       onFeedback(editingId ? "Bundle updated!" : "Bundle created!");
     } finally {
@@ -233,445 +289,21 @@ export default function BundlesTab({
   }
 
   const filteredProducts = storeProducts
-    .filter((p) => !productQuery.trim() || p.title.toLowerCase().includes(productQuery.trim().toLowerCase()))
-    .slice(0, 40);
+    .filter((p) => {
+      const matchQ = !productQuery.trim() || p.title.toLowerCase().includes(productQuery.trim().toLowerCase());
+      const matchU = unitFilter === "ALL" || (p.unit || "pcs") === unitFilter;
+      return matchQ && matchU;
+    })
+    .slice(0, 45);
 
-  // FULL-WIDTH 3-STEP BUILDER VIEW
-  if (builderOpen) {
-    return (
-      <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-        {/* Header Bar */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "10px",
-            paddingBottom: "12px",
-            borderBottom: "1px solid #e5e7eb",
-          }}
-        >
-          <div>
-            <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#111827" }}>
-              {editingId ? "Edit Bundle" : "Create New Bundle"}
-            </h3>
-            <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#6b7280" }}>
-              Simple 3-step builder — works with or without a poster photo.
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <button
-              type="button"
-              className="btn-secondary"
-              style={{ padding: "8px 14px", borderRadius: "8px" }}
-              onClick={() => setBuilderOpen(false)}
-            >
-              ← Back to Bundles
-            </button>
-            <button
-              type="submit"
-              className="btn-primary"
-              style={{ padding: "8px 18px", borderRadius: "8px", background: "#16b981", borderColor: "#16b981" }}
-              disabled={saving}
-            >
-              {saving ? "Saving..." : "Save Bundle"}
-            </button>
-          </div>
-        </div>
-
-        {/* STEP 1: Name, Short Description & Optional Poster */}
-        <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}>
-          <div style={{ fontSize: "13px", fontWeight: 700, color: "#0e8a60", marginBottom: "10px" }}>
-            STEP 1 · Name, Short Description & Optional Poster
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
-            <div>
-              <label style={labelStyle}>Bundle Name *</label>
-              <input
-                style={inputStyle}
-                type="text"
-                placeholder="e.g. Xirmada Qudaarta - Set B"
-                value={bTitle}
-                onChange={(e) => setBTitle(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>Short Description (shown below products)</label>
-              <input
-                style={inputStyle}
-                type="text"
-                placeholder="e.g. Ku filan 3-4 qof · 1 isbuuc · ~20 kg"
-                value={bDesc}
-                onChange={(e) => setBDesc(e.target.value)}
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>Poster Photo (Optional)</label>
-              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                <input
-                  style={{ ...inputStyle, flex: 1 }}
-                  type="text"
-                  placeholder="Leave empty or upload/paste URL"
-                  value={bPoster}
-                  onChange={(e) => setBPoster(e.target.value)}
-                />
-                <label
-                  style={{
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    padding: "9px 12px",
-                    borderRadius: "8px",
-                    border: "1px solid #d1d5db",
-                    background: "#f9fafb",
-                    fontSize: "12.5px",
-                    fontWeight: 600,
-                    color: "#374151",
-                  }}
-                >
-                  Upload
-                  <input
-                    type="file"
-                    accept="image/*"
-                    style={{ display: "none" }}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        if (typeof reader.result === "string") setBPoster(reader.result);
-                      };
-                      reader.readAsDataURL(file);
-                    }}
-                  />
-                </label>
-                {bPoster && (
-                  <button
-                    type="button"
-                    onClick={() => setBPoster("")}
-                    style={{ border: "none", background: "#fee2e2", color: "#dc2626", borderRadius: "7px", padding: "8px 10px", fontSize: "12px", cursor: "pointer" }}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* STEP 2 & 3: 2-Column Visual Product Picker + Pricing Summary */}
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.3fr) minmax(300px, 1fr)", gap: "16px", alignItems: "start" }}>
-          {/* LEFT: Visual Store Product Grid */}
-          <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}>
-            <div style={{ fontSize: "13px", fontWeight: 700, color: "#0e8a60", marginBottom: "10px" }}>
-              STEP 2 · Tap Real Store Products & Choose Quantity
-            </div>
-            <input
-              type="search"
-              style={{ ...inputStyle, marginBottom: "12px" }}
-              placeholder="Search your Shopify products (e.g. Yaanyo, Baradho, Milk)..."
-              value={productQuery}
-              onChange={(e) => setProductQuery(e.target.value)}
-            />
-
-            {productsLoading ? (
-              <div style={{ padding: "28px", textAlign: "center", color: "#6b7280", fontSize: "13px" }}>
-                Loading products from your Shopify store...
-              </div>
-            ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(175px, 1fr))",
-                  gap: "10px",
-                  maxHeight: "420px",
-                  overflowY: "auto",
-                  paddingRight: "4px",
-                }}
-              >
-                {filteredProducts.map((prod) => {
-                  const qty = getSelectedQty(prod.title);
-                  const isSelected = qty > 0;
-                  return (
-                    <div
-                      key={prod.id}
-                      style={{
-                        border: isSelected ? "2px solid #16b981" : "1px solid #e5e7eb",
-                        background: isSelected ? "#f0fdf4" : "#ffffff",
-                        borderRadius: "10px",
-                        padding: "10px",
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "space-between",
-                        gap: "8px",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        {prod.image ? (
-                          <img
-                            src={prod.image}
-                            alt=""
-                            style={{ width: "38px", height: "38px", borderRadius: "7px", objectFit: "cover", flexShrink: 0 }}
-                          />
-                        ) : (
-                          <div style={{ width: "38px", height: "38px", borderRadius: "7px", background: "#f3f4f6", flexShrink: 0 }} />
-                        )}
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: "12.5px", fontWeight: 600, color: "#111827", lineHeight: 1.25 }}>
-                            {prod.title}
-                          </div>
-                          <div style={{ fontSize: "12px", fontWeight: 700, color: "#0e8a60" }}>
-                            ${prod.price.toFixed(2)}
-                          </div>
-                        </div>
-                      </div>
-
-                      {isSelected ? (
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#ffffff", border: "1px solid #a7f3d0", borderRadius: "7px", padding: "3px 6px" }}>
-                          <button
-                            type="button"
-                            onClick={() => adjustProductQty(prod, -1)}
-                            style={{ width: "26px", height: "26px", border: "none", background: "#f3f4f6", borderRadius: "6px", fontWeight: 700, cursor: "pointer" }}
-                          >
-                            -
-                          </button>
-                          <span style={{ fontSize: "13px", fontWeight: 700, color: "#111827" }}>{qty}</span>
-                          <button
-                            type="button"
-                            onClick={() => adjustProductQty(prod, 1)}
-                            style={{ width: "26px", height: "26px", border: "none", background: "#16b981", color: "#fff", borderRadius: "6px", fontWeight: 700, cursor: "pointer" }}
-                          >
-                            +
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => adjustProductQty(prod, 1)}
-                          style={{
-                            width: "100%",
-                            padding: "6px",
-                            border: "1px solid #d1d5db",
-                            borderRadius: "7px",
-                            background: "#f9fafb",
-                            color: "#111827",
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                          }}
-                        >
-                          + Add
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT: Selected Items + Step 3 Price & Save */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-            <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <span style={{ fontSize: "13px", fontWeight: 700, color: "#111827" }}>
-                  Selected Items ({bItems.length})
-                </span>
-                <span style={{ fontSize: "13px", fontWeight: 700, color: "#0e8a60" }}>
-                  Normal Total: ${regularTotal.toFixed(2)}
-                </span>
-              </div>
-
-              {bItems.length === 0 ? (
-                <p style={{ margin: "8px 0", fontSize: "12.5px", color: "#6b7280" }}>
-                  Tap products on the left to add them to this bundle.
-                </p>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "200px", overflowY: "auto" }}>
-                  {bItems.map((it, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: "8px",
-                        padding: "6px 8px",
-                        background: "#f9fafb",
-                        borderRadius: "8px",
-                        fontSize: "12.5px",
-                      }}
-                    >
-                      <span style={{ fontWeight: 600, color: "#111827", flex: 1 }}>
-                        {it.title}{" "}
-                        <span style={{ color: "#0e8a60" }}>({formatQtyUnit(it.qty, it.unit)})</span>
-                      </span>
-                      <button
-                        type="button"
-                        title="Switch kg / pcs"
-                        onClick={() => {
-                          const next = [...bItems];
-                          next[idx] = { ...it, unit: it.unit === "kg" ? "pcs" : "kg" };
-                          setBItems(next);
-                        }}
-                        style={{
-                          border: "1px solid #d1d5db",
-                          background: "#ffffff",
-                          color: "#374151",
-                          borderRadius: "5px",
-                          padding: "2px 6px",
-                          fontSize: "11px",
-                          fontWeight: 600,
-                          cursor: "pointer",
-                        }}
-                      >
-                        {it.unit === "kg" ? "kg" : "pcs"}
-                      </button>
-                      <span style={{ color: "#4b5563", fontWeight: 600 }}>
-                        ${(it.qty * it.unitPrice).toFixed(2)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => updateItemsAndSyncPrice(bItems.filter((_, i) => i !== idx))}
-                        style={{ border: "none", background: "none", color: "#dc2626", fontWeight: 700, cursor: "pointer", fontSize: "14px" }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* STEP 3: Pricing & Optional Limited-Time Deal */}
-            <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: "#0e8a60" }}>
-                STEP 3 · Set Bundle Price & Stock
-              </div>
-
-              {regularTotal > 0 && (
-                <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "12px", color: "#6b7280" }}>Quick discount:</span>
-                  {[10, 15, 20].map((pct) => (
-                    <button
-                      key={pct}
-                      type="button"
-                      onClick={() => applyDiscountPercent(pct)}
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: "999px",
-                        border: "1px solid #a7f3d0",
-                        background: "#ecfdf5",
-                        color: "#0e8a60",
-                        fontSize: "12px",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                      }}
-                    >
-                      -{pct}%
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                <div>
-                  <label style={labelStyle}>Bundle Price ($ USD) *</label>
-                  <input
-                    style={inputStyle}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder={regularTotal > 0 ? regularTotal.toFixed(2) : "0.00"}
-                    value={bPrice}
-                    onChange={(e) => {
-                      setBPriceManual(true);
-                      setBPrice(e.target.value);
-                    }}
-                    required
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Stock Quantity *</label>
-                  <input
-                    style={inputStyle}
-                    type="number"
-                    min="0"
-                    value={bStock}
-                    onChange={(e) => setBStock(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              {savings > 0 && (
-                <div style={{ fontSize: "12.5px", fontWeight: 700, color: "#0e8a60", background: "#ecfdf5", padding: "8px 10px", borderRadius: "8px" }}>
-                  Customer saves ${savings.toFixed(2)} compared to buying individually!
-                </div>
-              )}
-
-              {/* Optional Limited-Time Price Drop */}
-              <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: "10px" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: 600, color: "#374151", cursor: "pointer" }}>
-                  <input type="checkbox" checked={bHasFlash} onChange={(e) => setBHasFlash(e.target.checked)} />
-                  Optional: Run a limited-time offer price on this bundle
-                </label>
-                {bHasFlash && (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "8px" }}>
-                    <div>
-                      <label style={labelStyle}>Offer Price ($ USD)</label>
-                      <input
-                        style={inputStyle}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="e.g. 30.00"
-                        value={bPromoPrice}
-                        onChange={(e) => setBPromoPrice(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Offer Ends At</label>
-                      <input
-                        style={inputStyle}
-                        type="datetime-local"
-                        value={bPromoEndsAt}
-                        onChange={(e) => setBPromoEndsAt(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "#374151", cursor: "pointer" }}>
-                <input type="checkbox" checked={bActive} onChange={(e) => setBActive(e.target.checked)} />
-                Show on QuickSuuq website
-              </label>
-
-              <button
-                type="submit"
-                className="btn-primary"
-                style={{ width: "100%", padding: "11px", borderRadius: "9px", background: "#16b981", borderColor: "#16b981", fontSize: "14px" }}
-                disabled={saving}
-              >
-                {saving ? "Saving..." : editingId ? "Save Changes" : "Create Bundle"}
-              </button>
-            </div>
-          </div>
-        </div>
-      </form>
-    );
-  }
-
-  // BUNDLES LIST VIEW (Matches Commissions / Orders Shopify Polaris table style)
   const visibleBundles = bundles.filter(
     (b) => !searchTerm.trim() || b.title.toLowerCase().includes(searchTerm.trim().toLowerCase())
   );
 
   return (
-    <div style={{ padding: "8px 0 24px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "14px" }}>
+    <div style={{ padding: "14px 18px 26px" }}>
+      {/* Top Toolbar with comfortable padding from card edges */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "18px" }}>
         <input
           type="search"
           placeholder="Search bundles..."
@@ -679,25 +311,12 @@ export default function BundlesTab({
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{ ...inputStyle, maxWidth: "320px" }}
         />
-        <button
-          type="button"
-          onClick={openNewBuilder}
-          style={{
-            whiteSpace: "nowrap",
-            padding: "8px 14px",
-            borderRadius: "8px",
-            border: "1px solid #111827",
-            background: "#1f2937",
-            color: "#ffffff",
-            fontSize: "13px",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
+        <button type="button" onClick={openNewModal} style={blackBtnStyle}>
           + New Bundle
         </button>
       </div>
 
+      {/* Bundle Cards Grid */}
       {visibleBundles.length === 0 ? (
         <div className="empty-state">
           No bundles found. Click <strong>+ New Bundle</strong> to create one.
@@ -736,7 +355,7 @@ export default function BundlesTab({
                   ) : (
                     <div
                       style={{
-                        padding: "14px 16px",
+                        padding: "12px 16px",
                         background: "#f9fafb",
                         borderBottom: "1px solid #e1e3e5",
                         display: "flex",
@@ -745,7 +364,7 @@ export default function BundlesTab({
                         gap: "8px",
                       }}
                     >
-                      <span style={{ fontSize: "12px", fontWeight: 700, color: "#4b5563", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#4b5563", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                         QuickSuuq Bundle
                       </span>
                       {saveAmt > 0 && (
@@ -767,7 +386,6 @@ export default function BundlesTab({
                       </span>
                     </div>
 
-                    {/* Items with kg / pcs labels */}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "8px" }}>
                       {b.items.slice(0, 6).map((it, idx) => (
                         <span
@@ -842,17 +460,8 @@ export default function BundlesTab({
                   <div style={{ display: "flex", gap: "6px" }}>
                     <button
                       type="button"
-                      onClick={() => openEditBuilder(b)}
-                      style={{
-                        padding: "5px 12px",
-                        borderRadius: "6px",
-                        border: "1px solid #111827",
-                        background: "#1f2937",
-                        color: "#ffffff",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
+                      onClick={() => openEditModal(b)}
+                      style={{ ...blackBtnStyle, padding: "5px 12px", fontSize: "12px", borderRadius: "6px" }}
                     >
                       Edit
                     </button>
@@ -864,6 +473,448 @@ export default function BundlesTab({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* CLEAN 3-STEP SHOPIFY WIZARD MODAL (One step at a time!) */}
+      {modalOpen && (
+        <div className="modal-backdrop">
+          <div
+            className="modal-card"
+            style={{
+              maxWidth: "580px",
+              width: "95%",
+              borderRadius: "14px",
+              padding: "20px 22px",
+              boxShadow: "0 20px 50px rgba(0,0,0,0.18)",
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+              <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 700, color: "#111827" }}>
+                {editingId ? "Edit Bundle" : "New Bundle"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                style={{ border: "none", background: "#f3f4f6", color: "#374151", width: "28px", height: "28px", borderRadius: "50%", fontSize: "16px", cursor: "pointer" }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* 1 -> 2 -> 3 Step Tracker */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "18px" }}>
+              {[
+                { num: 1 as const, label: "1. Details" },
+                { num: 2 as const, label: `2. Products (${bItems.length})` },
+                { num: 3 as const, label: "3. Price & Save" },
+              ].map((s) => {
+                const isCurrent = step === s.num;
+                const isDone = step > s.num;
+                return (
+                  <button
+                    key={s.num}
+                    type="button"
+                    onClick={() => {
+                      if (s.num > 1 && !bTitle.trim()) return;
+                      setStep(s.num);
+                    }}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: "8px",
+                      border: isCurrent ? "1px solid #111827" : "1px solid #e5e7eb",
+                      background: isCurrent ? "#1f2937" : isDone ? "#f3f4f6" : "#ffffff",
+                      color: isCurrent ? "#ffffff" : "#374151",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      textAlign: "center",
+                    }}
+                  >
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* STEP 1: DETAILS */}
+            {step === 1 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div>
+                  <label style={labelStyle}>Bundle Name *</label>
+                  <input
+                    style={inputStyle}
+                    type="text"
+                    placeholder="e.g. Xirmada Qudaarta - Set B"
+                    value={bTitle}
+                    onChange={(e) => setBTitle(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Short Description (optional)</label>
+                  <input
+                    style={inputStyle}
+                    type="text"
+                    placeholder="e.g. Ku filan 3-4 qof · 1 isbuuc · ~20 kg"
+                    value={bDesc}
+                    onChange={(e) => setBDesc(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Poster Image (optional)</label>
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    <input
+                      style={{ ...inputStyle, flex: 1 }}
+                      type="text"
+                      placeholder="Leave empty or upload/paste URL"
+                      value={bPoster}
+                      onChange={(e) => setBPoster(e.target.value)}
+                    />
+                    <label
+                      style={{
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                        padding: "9px 12px",
+                        borderRadius: "8px",
+                        border: "1px solid #d1d5db",
+                        background: "#f9fafb",
+                        fontSize: "12.5px",
+                        fontWeight: 600,
+                        color: "#374151",
+                      }}
+                    >
+                      Upload
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: "none" }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            if (typeof reader.result === "string") setBPoster(reader.result);
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+                    {bPoster && (
+                      <button
+                        type="button"
+                        onClick={() => setBPoster("")}
+                        style={{ border: "none", background: "#fee2e2", color: "#dc2626", borderRadius: "7px", padding: "9px 10px", fontSize: "12px", cursor: "pointer" }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 2: PRODUCTS (kg / pcs / liter) */}
+            {step === 2 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                  <input
+                    type="search"
+                    style={{ ...inputStyle, flex: 1, minWidth: "180px" }}
+                    placeholder="Search store products (Yaanyo, Milk, Oil)..."
+                    value={productQuery}
+                    onChange={(e) => setProductQuery(e.target.value)}
+                  />
+                  <div style={{ display: "inline-flex", gap: "4px", background: "#f3f4f6", padding: "3px", borderRadius: "8px" }}>
+                    {(["ALL", "kg", "pcs", "liter"] as const).map((u) => (
+                      <button
+                        key={u}
+                        type="button"
+                        onClick={() => setUnitFilter(u)}
+                        style={{
+                          padding: "5px 10px",
+                          borderRadius: "6px",
+                          border: "none",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          background: unitFilter === u ? "#1f2937" : "transparent",
+                          color: unitFilter === u ? "#ffffff" : "#4b5563",
+                        }}
+                      >
+                        {u === "ALL" ? "All" : u}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Clean Product List */}
+                <div style={{ maxHeight: "230px", overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: "10px", background: "#ffffff" }}>
+                  {productsLoading ? (
+                    <div style={{ padding: "20px", textAlign: "center", fontSize: "13px", color: "#6b7280" }}>
+                      Loading products from Shopify...
+                    </div>
+                  ) : filteredProducts.length === 0 ? (
+                    <div style={{ padding: "20px", textAlign: "center", fontSize: "13px", color: "#6b7280" }}>
+                      No matching products found.
+                    </div>
+                  ) : (
+                    filteredProducts.map((prod) => {
+                      const qty = getSelectedQty(prod.title);
+                      const unit = prod.unit || "pcs";
+                      return (
+                        <div
+                          key={prod.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "10px",
+                            padding: "8px 12px",
+                            borderBottom: "1px solid #f3f4f6",
+                            background: qty > 0 ? "#f9fafb" : "#ffffff",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                            {prod.image ? (
+                              <img src={prod.image} alt="" style={{ width: "32px", height: "32px", borderRadius: "6px", objectFit: "cover", flexShrink: 0 }} />
+                            ) : (
+                              <div style={{ width: "32px", height: "32px", borderRadius: "6px", background: "#f3f4f6", flexShrink: 0 }} />
+                            )}
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: "13px", fontWeight: 600, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                {prod.title}
+                              </div>
+                              <div style={{ fontSize: "11.5px", color: "#6b7280" }}>
+                                ${prod.price.toFixed(2)} / {unit}
+                              </div>
+                            </div>
+                          </div>
+
+                          {qty > 0 ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                              <button
+                                type="button"
+                                onClick={() => adjustProductQty(prod, -1)}
+                                style={{ width: "26px", height: "26px", border: "1px solid #d1d5db", background: "#fff", borderRadius: "6px", fontWeight: 700, cursor: "pointer" }}
+                              >
+                                -
+                              </button>
+                              <span style={{ fontSize: "12.5px", fontWeight: 700, minWidth: "38px", textAlign: "center" }}>
+                                {formatQtyUnit(qty, unit)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => adjustProductQty(prod, 1)}
+                                style={{ width: "26px", height: "26px", border: "1px solid #111827", background: "#1f2937", color: "#fff", borderRadius: "6px", fontWeight: 700, cursor: "pointer" }}
+                              >
+                                +
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => adjustProductQty(prod, 1)}
+                              style={{ padding: "5px 12px", border: "1px solid #d1d5db", background: "#ffffff", borderRadius: "6px", fontSize: "12px", fontWeight: 600, color: "#111827", cursor: "pointer", flexShrink: 0 }}
+                            >
+                              + Add
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Selected Items Summary */}
+                {bItems.length > 0 && (
+                  <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "10px 12px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", fontWeight: 700, color: "#111827", marginBottom: "6px" }}>
+                      <span>Selected ({bItems.length})</span>
+                      <span>Normal Total: ${regularTotal.toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", maxHeight: "90px", overflowY: "auto" }}>
+                      {bItems.map((it, idx) => (
+                        <span
+                          key={idx}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            background: "#ffffff",
+                            border: "1px solid #d1d5db",
+                            borderRadius: "6px",
+                            padding: "3px 7px",
+                            fontSize: "12px",
+                          }}
+                        >
+                          <span>{it.title} ({formatQtyUnit(it.qty, it.unit)})</span>
+                          <button
+                            type="button"
+                            title="Switch kg / pcs / liter"
+                            onClick={() => {
+                              const next = [...bItems];
+                              next[idx] = { ...it, unit: nextUnit(it.unit) };
+                              setBItems(next);
+                            }}
+                            style={{ border: "none", background: "#f3f4f6", color: "#374151", borderRadius: "4px", padding: "1px 5px", fontSize: "10.5px", fontWeight: 700, cursor: "pointer" }}
+                          >
+                            {it.unit || "pcs"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateItemsAndSyncPrice(bItems.filter((_, i) => i !== idx))}
+                            style={{ border: "none", background: "none", color: "#dc2626", fontWeight: 700, cursor: "pointer", padding: 0 }}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* STEP 3: PRICE & STOCK */}
+            {step === 3 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "13px", color: "#4b5563", fontWeight: 600 }}>
+                    Normal price ({bItems.length} items individually)
+                  </span>
+                  <span style={{ fontSize: "16px", fontWeight: 800, color: "#111827" }}>
+                    ${regularTotal.toFixed(2)}
+                  </span>
+                </div>
+
+                {/* Synced Discount % OR Direct Bundle Price */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <div>
+                    <label style={labelStyle}>Discount % (1–99%)</label>
+                    <input
+                      style={inputStyle}
+                      type="number"
+                      min="0"
+                      max="99"
+                      placeholder="e.g. 15"
+                      value={bDiscountPct}
+                      onChange={(e) => handleDiscountPctChange(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Bundle Price ($ USD) *</label>
+                    <input
+                      style={inputStyle}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder={regularTotal > 0 ? regularTotal.toFixed(2) : "0.00"}
+                      value={bPrice}
+                      onChange={(e) => handleBundlePriceChange(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {savings > 0 && (
+                  <div style={{ fontSize: "12.5px", fontWeight: 600, color: "#008060", background: "#f1f8f5", border: "1px solid #bbe5b3", padding: "8px 12px", borderRadius: "8px" }}>
+                    Customer pays <strong>${bundlePriceNum.toFixed(2)}</strong> instead of ${regularTotal.toFixed(2)} (Saves ${savings.toFixed(2)})
+                  </div>
+                )}
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", alignItems: "end" }}>
+                  <div>
+                    <label style={labelStyle}>Stock Quantity *</label>
+                    <input
+                      style={inputStyle}
+                      type="number"
+                      min="0"
+                      value={bStock}
+                      onChange={(e) => setBStock(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "#374151", cursor: "pointer", paddingBottom: "9px" }}>
+                    <input type="checkbox" checked={bActive} onChange={(e) => setBActive(e.target.checked)} />
+                    Show on QuickSuuq website
+                  </label>
+                </div>
+
+                <div style={{ borderTop: "1px solid #f1f2f3", paddingTop: "10px" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: 600, color: "#374151", cursor: "pointer" }}>
+                    <input type="checkbox" checked={bHasFlash} onChange={(e) => setBHasFlash(e.target.checked)} />
+                    Optional: Limited-time offer price
+                  </label>
+                  {bHasFlash && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "8px" }}>
+                      <div>
+                        <label style={labelStyle}>Offer Price ($)</label>
+                        <input style={inputStyle} type="number" step="0.01" min="0" placeholder="e.g. 28.00" value={bPromoPrice} onChange={(e) => setBPromoPrice(e.target.value)} />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Ends At</label>
+                        <input style={inputStyle} type="datetime-local" value={bPromoEndsAt} onChange={(e) => setBPromoEndsAt(e.target.value)} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Modal Footer Navigation */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "20px", paddingTop: "14px", borderTop: "1px solid #e5e7eb" }}>
+              <div>
+                {step > 1 ? (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ padding: "8px 14px", borderRadius: "8px" }}
+                    onClick={() => setStep((step - 1) as 1 | 2)}
+                  >
+                    ← Back
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ padding: "8px 14px", borderRadius: "8px" }}
+                    onClick={() => setModalOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+
+              <div>
+                {step < 3 ? (
+                  <button
+                    type="button"
+                    style={blackBtnStyle}
+                    onClick={() => {
+                      if (step === 1 && !bTitle.trim()) {
+                        alert("Please enter a bundle name.");
+                        return;
+                      }
+                      setStep((step + 1) as 2 | 3);
+                    }}
+                  >
+                    Next →
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    style={blackBtnStyle}
+                    disabled={saving}
+                    onClick={handleSave}
+                  >
+                    {saving ? "Saving..." : editingId ? "Save Changes" : "Save Bundle"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

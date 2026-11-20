@@ -1298,7 +1298,7 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
             >
               View Store ↗
             </a>
-            <span className="rate-badge live">● Live Sync</span>
+            {/* Live Sync badge removed per admin UI preference */}
             <button onClick={handleLogout} className="btn-logout">
               Exit
             </button>
