@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import BundleBannersTab from "./BundleBannersTab";
 import BundlesTab from "./BundlesTab";
 import PromotionsTab from "./PromotionsTab";
-import type { BundleRecord, PromotionRecord } from "@/lib/promotions";
+import type { BundleBannerRecord, BundleRecord, PromotionRecord } from "@/lib/promotions";
 
 interface Salesperson {
   id: string;
@@ -188,9 +189,10 @@ export default function AdminDashboardPage() {
   >("commissions");
   const [bundlesList, setBundlesList] = useState<BundleRecord[]>([]);
   const [promotionsList, setPromotionsList] = useState<PromotionRecord[]>([]);
+  const [bundleBannersList, setBundleBannersList] = useState<BundleBannerRecord[]>([]);
   const [deliverySubTab, setDeliverySubTab] = useState<"areas" | "vehicles" | "drivers">("areas");
   const [storefrontSubTab, setStorefrontSubTab] = useState<
-    "hero" | "categories" | "promos" | "products"
+    "hero" | "categories" | "promos" | "products" | "bundle_banners"
   >("hero");
 
   // Storefront CMS CRUD states
@@ -478,7 +480,7 @@ export default function AdminDashboardPage() {
 
   async function loadAllData() {
     try {
-      const [repsRes, commsRes, paysRes, delivRes, ordsRes, sfRes, promoRes] = await Promise.all([
+      const [repsRes, commsRes, paysRes, delivRes, ordsRes, sfRes, promoRes, bnrRes] = await Promise.all([
         adminFetch("/api/admin/salespeople"),
         adminFetch("/api/admin/commissions"),
         adminFetch("/api/admin/payouts"),
@@ -486,6 +488,7 @@ export default function AdminDashboardPage() {
         adminFetch("/api/admin/orders"),
         adminFetch("/api/admin/storefront"),
         adminFetch("/api/admin/promotions"),
+        adminFetch("/api/admin/bundle-banners"),
       ]);
       if (repsRes.ok) {
         const d = await repsRes.json();
@@ -526,17 +529,28 @@ export default function AdminDashboardPage() {
         setBundlesList(d.bundles || []);
         setPromotionsList(d.promotions || []);
       }
+      if (bnrRes.ok) {
+        const d = await bnrRes.json();
+        setBundleBannersList(d.banners || []);
+      }
     } catch (e) {
       console.error("Error loading admin data:", e);
     }
   }
 
   async function refreshPromotions() {
-    const r = await adminFetch("/api/admin/promotions");
+    const [r, br] = await Promise.all([
+      adminFetch("/api/admin/promotions"),
+      adminFetch("/api/admin/bundle-banners"),
+    ]);
     if (r.ok) {
       const d = await r.json();
       setBundlesList(d.bundles || []);
       setPromotionsList(d.promotions || []);
+    }
+    if (br.ok) {
+      const d = await br.json();
+      setBundleBannersList(d.banners || []);
     }
   }
 
@@ -2565,6 +2579,13 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                 >
                   🛍️ Popular Products
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setStorefrontSubTab("bundle_banners")}
+                  className={`btn-action ${storefrontSubTab === "bundle_banners" ? "primary" : "secondary"}`}
+                >
+                  ✨ Bundle Banners ({bundleBannersList.length})
+                </button>
               </div>
 
               <button
@@ -2576,6 +2597,16 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                 {savingStorefront ? "Publishing to Shopify..." : "✓ Save & Publish Changes"}
               </button>
             </div>
+
+            {storefrontSubTab === "bundle_banners" && (
+              <BundleBannersTab
+                banners={bundleBannersList}
+                bundles={bundlesList}
+                adminFetch={adminFetch}
+                onRefresh={refreshPromotions}
+                onFeedback={showFeedback}
+              />
+            )}
 
             {/* ==============================================================
                 CMS SUB-TAB 1: HERO CAROUSEL SLIDER CRUD

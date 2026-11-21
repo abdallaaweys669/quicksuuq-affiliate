@@ -30,6 +30,30 @@ export interface BundleRecord {
   updated_at: string;
 }
 
+export interface BannerElementConfig {
+  id: "title" | "subtitle" | "price" | "button";
+  text: string;
+  x: number; // percentage 0-90
+  y: number; // percentage 0-90
+  fontSize: number;
+  fontWeight: "400" | "600" | "700" | "800";
+  fontFamily: "sans" | "serif" | "mono";
+  color: string;
+  bgColor?: string;
+  visible: boolean;
+}
+
+export interface BundleBannerRecord {
+  id: string;
+  bundle_id: string;
+  bg_image: string | null;
+  bg_color: string;
+  elements: BannerElementConfig[];
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface PromotionRecord {
   id: string;
   title: string;
@@ -213,6 +237,19 @@ export async function ensurePromotionsTables(): Promise<void> {
   await query(`ALTER TABLE public.promotions ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5,2)`);
   await query(`ALTER TABLE public.promotions DROP CONSTRAINT IF EXISTS promotions_rule_type_check`).catch(() => {});
 
+  await query(`
+    CREATE TABLE IF NOT EXISTS public.bundle_banners (
+      id TEXT PRIMARY KEY,
+      bundle_id TEXT NOT NULL,
+      bg_image TEXT,
+      bg_color TEXT NOT NULL DEFAULT '#0e8a60',
+      elements_json TEXT NOT NULL DEFAULT '[]',
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
   const bundleCount = await query<{ n: number }>("SELECT count(*)::int AS n FROM public.bundles");
   const legacyVariantCheck = await query<{ id: string; shopify_variant_id: string | null }>(
     `SELECT id, shopify_variant_id FROM public.bundles WHERE id IN ('bnd_xirmada_set_a', 'bnd_xirmada_set_b', 'bnd_xirmada_set_c')`
@@ -264,6 +301,62 @@ export async function ensurePromotionsTables(): Promise<void> {
         "FREE_DELIVERY",
         endsAt,
       ]
+    );
+  }
+
+  const bannerCount = await query<{ n: number }>("SELECT count(*)::int AS n FROM public.bundle_banners");
+  if (!bannerCount.rows[0]?.n) {
+    const defaultElements: BannerElementConfig[] = [
+      {
+        id: "title",
+        text: "Xirmada Qudaarta - Set A",
+        x: 6,
+        y: 16,
+        fontSize: 28,
+        fontWeight: "800",
+        fontFamily: "sans",
+        color: "#ffffff",
+        visible: true,
+      },
+      {
+        id: "subtitle",
+        text: "Fresh weekly family pack · Save when you buy together",
+        x: 6,
+        y: 38,
+        fontSize: 15,
+        fontWeight: "400",
+        fontFamily: "sans",
+        color: "#ecfdf5",
+        visible: true,
+      },
+      {
+        id: "price",
+        text: "",
+        x: 6,
+        y: 55,
+        fontSize: 22,
+        fontWeight: "800",
+        fontFamily: "sans",
+        color: "#ffffff",
+        visible: true,
+      },
+      {
+        id: "button",
+        text: "Buy Now",
+        x: 6,
+        y: 74,
+        fontSize: 14,
+        fontWeight: "700",
+        fontFamily: "sans",
+        color: "#111827",
+        bgColor: "#ffffff",
+        visible: true,
+      },
+    ];
+    await query(
+      `INSERT INTO public.bundle_banners (id, bundle_id, bg_image, bg_color, elements_json, is_active, sort_order)
+       VALUES ($1, $2, NULL, '#0e8a60', $3, TRUE, 0)`,
+      ["bnr_starter_set_a", "bnd_xirmada_set_a", JSON.stringify(defaultElements)]
     );
   }
 
@@ -478,6 +571,26 @@ export function mapBundleRow(row: Record<string, unknown>): BundleRecord {
     shopify_variant_id: row.shopify_variant_id ? String(row.shopify_variant_id) : null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
+  };
+}
+
+export function mapBannerRow(row: Record<string, unknown>): BundleBannerRecord {
+  let elements: BannerElementConfig[] = [];
+  try {
+    const parsed = JSON.parse(String(row.elements_json || "[]"));
+    if (Array.isArray(parsed)) elements = parsed;
+  } catch {
+    elements = [];
+  }
+  return {
+    id: String(row.id),
+    bundle_id: String(row.bundle_id),
+    bg_image: row.bg_image ? String(row.bg_image) : null,
+    bg_color: String(row.bg_color || "#0e8a60"),
+    elements,
+    is_active: Boolean(row.is_active),
+    sort_order: Number(row.sort_order || 0),
+    created_at: String(row.created_at),
   };
 }
 

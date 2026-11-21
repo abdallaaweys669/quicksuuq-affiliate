@@ -1,6 +1,6 @@
 ﻿import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { ensurePromotionsTables, mapBundleRow, mapPromotionRow } from "@/lib/promotions";
+import { ensurePromotionsTables, mapBannerRow, mapBundleRow, mapPromotionRow } from "@/lib/promotions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ export async function GET() {
   try {
     await ensurePromotionsTables();
 
-    const [bRes, pRes] = await Promise.all([
+    const [bRes, pRes, bnRes] = await Promise.all([
       query(
         `SELECT * FROM public.bundles
          WHERE is_active = TRUE AND stock > 0
@@ -38,12 +38,28 @@ export async function GET() {
            )
          ORDER BY created_at DESC`
       ),
+      query(
+        `SELECT * FROM public.bundle_banners
+         WHERE is_active = TRUE
+         ORDER BY sort_order ASC, created_at DESC`
+      ),
     ]);
+
+    const bundles = bRes.rows.map(mapBundleRow);
+    const bundlesById = new Map(bundles.map((b) => [b.id, b]));
+    const bundleBanners = bnRes.rows
+      .map(mapBannerRow)
+      .map((bn) => ({
+        ...bn,
+        bundle: bundlesById.get(bn.bundle_id) || null,
+      }))
+      .filter((bn) => bn.bundle !== null);
 
     return NextResponse.json(
       {
-        bundles: bRes.rows.map(mapBundleRow),
+        bundles,
         promotions: pRes.rows.map(mapPromotionRow),
+        bundle_banners: bundleBanners,
       },
       {
         headers: {
