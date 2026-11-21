@@ -97,9 +97,6 @@ export async function GET() {
         marqueeItemsOut = [];
       }
     } else {
-      if (settingsMap.get("top_marquee_text")) {
-        marqueeItemsOut.push({ id: "mq_legacy", text: String(settingsMap.get("top_marquee_text")), badge: null });
-      }
       for (const p of promotions) {
         const badge =
           p.rule_type === "FIRST_N_CUSTOMERS" && p.max_claims != null
@@ -108,6 +105,20 @@ export async function GET() {
             ? `${p.discount_percent || 20}% OFF`
             : "Limited Time";
         marqueeItemsOut.push({ id: `promo_${p.id}`, text: p.title, badge });
+      }
+      if (settingsMap.get("top_marquee_text")) {
+        marqueeItemsOut.push({ id: "mq_legacy", text: String(settingsMap.get("top_marquee_text")), badge: null });
+      } else {
+        marqueeItemsOut.push({
+          id: "mq_fast_delivery",
+          text: "Fast Mogadishu Delivery · Fresh Groceries Daily",
+          badge: null,
+        });
+        marqueeItemsOut.push({
+          id: "mq_evc_plus",
+          text: "Pay Easily & Securely with EVC Plus",
+          badge: null,
+        });
       }
     }
 
