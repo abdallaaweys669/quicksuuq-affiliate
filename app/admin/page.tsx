@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import BundleBannersTab from "./BundleBannersTab";
+import TopMarqueeTab from "./TopMarqueeTab";
 import BundlesTab from "./BundlesTab";
 import PromotionsTab from "./PromotionsTab";
 import type { BundleBannerRecord, BundleRecord, PromotionRecord } from "@/lib/promotions";
@@ -192,8 +193,8 @@ export default function AdminDashboardPage() {
   const [bundleBannersList, setBundleBannersList] = useState<BundleBannerRecord[]>([]);
   const [deliverySubTab, setDeliverySubTab] = useState<"areas" | "vehicles" | "drivers">("areas");
   const [storefrontSubTab, setStorefrontSubTab] = useState<
-    "hero" | "categories" | "promos" | "products" | "bundle_banners"
-  >("hero");
+    "hero" | "categories" | "promos" | "products" | "bundle_banners" | "marquee"
+  >("bundle_banners");
 
   // Storefront CMS CRUD states
   const [heroSlider, setHeroSlider] = useState<{
@@ -2593,7 +2594,14 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                   onClick={() => setStorefrontSubTab("bundle_banners")}
                   className={`btn-action ${storefrontSubTab === "bundle_banners" ? "primary" : "secondary"}`}
                 >
-                  ✨ Bundle Banners ({bundleBannersList.length})
+                  ✨ Top Banners ({bundleBannersList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStorefrontSubTab("marquee")}
+                  className={`btn-action ${storefrontSubTab === "marquee" ? "primary" : "secondary"}`}
+                >
+                  📢 Top Marquee
                 </button>
               </div>
 
@@ -2613,6 +2621,14 @@ Fadlan taleefankaaga fur ku hay si uu darawalku kuula soo xiriiro markuu goobtaa
                 bundles={bundlesList}
                 adminFetch={adminFetch}
                 onRefresh={refreshPromotions}
+                onFeedback={showFeedback}
+              />
+            )}
+
+            {storefrontSubTab === "marquee" && (
+              <TopMarqueeTab
+                promotions={promotionsList}
+                adminFetch={adminFetch}
                 onFeedback={showFeedback}
               />
             )}

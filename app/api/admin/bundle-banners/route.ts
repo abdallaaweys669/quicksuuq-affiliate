@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { ensurePromotionsTables, mapBannerRow } from "@/lib/promotions";
+import { ensurePromotionsTables, mapBannerRow, type MarqueeItem } from "@/lib/promotions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,11 +20,34 @@ export async function GET() {
     );
     const [res, mqRes] = await Promise.all([
       query("SELECT * FROM public.bundle_banners ORDER BY sort_order ASC, created_at DESC"),
-      query<{ value: string }>("SELECT value FROM public.site_settings WHERE key = 'top_marquee_text' LIMIT 1"),
+      query<{ key: string; value: string }>(
+        "SELECT key, value FROM public.site_settings WHERE key IN ('top_marquee_items', 'top_marquee_text')"
+      ),
     ]);
+    const settingsMap = new Map(mqRes.rows.map((r) => [r.key, r.value]));
+    let marqueeItems: MarqueeItem[] = [];
+    const rawItems = settingsMap.get("top_marquee_items");
+    if (rawItems) {
+      try {
+        const parsed = JSON.parse(rawItems);
+        if (Array.isArray(parsed)) marqueeItems = parsed;
+      } catch {
+        marqueeItems = [];
+      }
+    } else if (settingsMap.get("top_marquee_text")) {
+      marqueeItems = [
+        {
+          id: "mq_legacy",
+          text: String(settingsMap.get("top_marquee_text")),
+          promotion_id: null,
+          is_active: true,
+        },
+      ];
+    }
     return NextResponse.json({
       banners: res.rows.map(mapBannerRow),
-      marquee_text: mqRes.rows[0]?.value ?? "",
+      marquee_items: marqueeItems,
+      marquee_text: settingsMap.get("top_marquee_text") ?? "",
     });
   } catch (err) {
     console.error("GET /api/admin/bundle-banners failed:", err);
@@ -105,6 +128,24 @@ export async function PUT(request: NextRequest) {
     await ensurePromotionsTables();
 
     const body = await request.json();
+    if (Array.isArray(body.marquee_items)) {
+      const cleaned: MarqueeItem[] = body.marquee_items
+        .filter((m: any) => String(m?.text || "").trim())
+        .map((m: any) => ({
+          id: String(m.id || `mq_${randomUUID().slice(0, 8)}`),
+          text: String(m.text).trim(),
+          promotion_id: m.promotion_id ? String(m.promotion_id).trim() : null,
+          is_active: m.is_active !== false,
+        }));
+      await query(
+        `INSERT INTO public.site_settings (key, value, updated_at)
+         VALUES ('top_marquee_items', $1, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [JSON.stringify(cleaned)]
+      );
+      return NextResponse.json({ success: true, marquee_items: cleaned });
+    }
+
     const marqueeText = String(body.marquee_text ?? "").trim();
     await query(
       `INSERT INTO public.site_settings (key, value, updated_at)
@@ -115,7 +156,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true, marquee_text: marqueeText });
   } catch (err) {
     console.error("PUT /api/admin/bundle-banners failed:", err);
-    return NextResponse.json({ error: "Failed to save marquee text" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to save marquee items" }, { status: 500 });
   }
 }
 

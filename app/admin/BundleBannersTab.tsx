@@ -108,17 +108,9 @@ export default function BundleBannersTab({
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [marqueeText, setMarqueeText] = useState<string>("");
-  const [savingMarquee, setSavingMarquee] = useState(false);
   const [storeProducts, setStoreProducts] = useState<Array<{ title: string; handle: string; price: string; compare_at_price?: string | null }>>([]);
 
   useEffect(() => {
-    adminFetch("/api/admin/bundle-banners")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d && typeof d.marquee_text === "string") setMarqueeText(d.marquee_text);
-      })
-      .catch(() => {});
     adminFetch("/api/admin/products")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
@@ -643,43 +635,8 @@ export default function BundleBannersTab({
     );
   }
 
-  async function saveMarquee() {
-    setSavingMarquee(true);
-    try {
-      const res = await adminFetch("/api/admin/bundle-banners", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ marquee_text: marqueeText }),
-      });
-      if (res.ok) onFeedback("Top marquee text saved!");
-    } finally {
-      setSavingMarquee(false);
-    }
-  }
-
   return (
     <div style={{ padding: "12px 4px 20px" }}>
-      {/* TOP MARQUEE TEXT EDITOR */}
-      <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "12px 14px", marginBottom: "16px" }}>
-        <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>
-          Top-of-Site Scrolling Marquee Text
-        </label>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-          <input
-            style={{ ...inputStyle, flex: 1, minWidth: "240px" }}
-            placeholder="e.g. Fast Mogadishu Delivery · Pay easily with EVC Plus · Fresh Daily Produce"
-            value={marqueeText}
-            onChange={(e) => setMarqueeText(e.target.value)}
-          />
-          <button type="button" style={blackBtnStyle} disabled={savingMarquee} onClick={saveMarquee}>
-            {savingMarquee ? "Saving..." : "Save Marquee"}
-          </button>
-        </div>
-        <div style={{ fontSize: "11.5px", color: "#64748b", marginTop: "4px" }}>
-          Scrolls at the very top of your website alongside active promotions (like First 20 Customers Free Delivery).
-        </div>
-      </div>
-
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
         <p style={{ margin: 0, fontSize: "13px", color: "#6b7280" }}>
           Design slideable Top Banners (bundles, discounted products, or app/store promo slides) with drag-and-drop text & buttons.

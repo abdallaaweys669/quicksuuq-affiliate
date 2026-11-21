@@ -55,6 +55,13 @@ export interface BundleBannerRecord {
   created_at: string;
 }
 
+export interface MarqueeItem {
+  id: string;
+  text: string;
+  promotion_id: string | null;
+  is_active: boolean;
+}
+
 export interface PromotionRecord {
   id: string;
   title: string;
