@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processCancelledOrder, processPaidOrder, processRefund } from "@/lib/affiliate";
+import { recordBundleAndPromoSales } from "@/lib/promotions";
 import { validateShopifyStore, verifyShopifyHmac } from "@/lib/shopify";
 
 export const runtime = "nodejs";
@@ -26,7 +27,13 @@ export async function POST(request: NextRequest) {
   try {
     let result: unknown;
     switch (topic) {
-      case "orders/paid": result = await processPaidOrder(payload); break;
+      case "orders/paid":
+        result = await processPaidOrder(payload);
+        await recordBundleAndPromoSales({
+          lineItems: Array.isArray(payload.line_items) ? payload.line_items : [],
+          orderSubtotalUsd: Number(payload.subtotal_price || payload.total_price || 0),
+        });
+        break;
       case "orders/cancelled": result = await processCancelledOrder(payload); break;
       case "refunds/create": result = await processRefund(payload); break;
       default: return NextResponse.json({ received: true, ignored: true, topic });

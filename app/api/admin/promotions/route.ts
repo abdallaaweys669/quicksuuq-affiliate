@@ -7,6 +7,7 @@ import {
   mapBundleRow,
   mapPromotionRow,
   slugifyBundle,
+  syncBundleToShopify,
   type BundleItem,
 } from "@/lib/promotions";
 
@@ -104,7 +105,12 @@ export async function POST(request: NextRequest) {
         ]
       );
 
-      return NextResponse.json({ bundle: mapBundleRow(ins.rows[0]) }, { status: 201 });
+      const savedBundle = mapBundleRow(ins.rows[0]);
+      const synced = await syncBundleToShopify(savedBundle);
+      return NextResponse.json(
+        { bundle: { ...savedBundle, ...synced } },
+        { status: 201 }
+      );
     }
 
     const title = String(body.title || "").trim();
@@ -202,7 +208,9 @@ export async function PATCH(request: NextRequest) {
           isActive,
         ]
       );
-      return NextResponse.json({ bundle: mapBundleRow(upd.rows[0]) });
+      const updatedBundle = mapBundleRow(upd.rows[0]);
+      const synced = await syncBundleToShopify(updatedBundle);
+      return NextResponse.json({ bundle: { ...updatedBundle, ...synced } });
     }
 
     const existing = await query("SELECT * FROM public.promotions WHERE id = $1", [id]);

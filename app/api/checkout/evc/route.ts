@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { processPaidOrder } from "@/lib/affiliate";
+import { checkActiveFreeDelivery, recordBundleAndPromoSales } from "@/lib/promotions";
 import { normalizeSomaliPhone } from "@/lib/shopify";
 import { getDeliveryConfig } from "@/lib/delivery-db";
 
@@ -246,7 +247,9 @@ export async function POST(request: NextRequest) {
     const heavySurchargeVal = deliveryConfig?.settings.heavy_surcharge_usd ?? 1.00;
     const isHeavyOrder = totalWeightKg > heavyThresholdKg;
     const heavyOrderSurcharge = isHeavyOrder ? heavySurchargeVal : 0.00;
-    const finalDeliveryFee = Number((baseDeliveryFee + heavyOrderSurcharge).toFixed(2));
+    const rawDeliveryFee = Number((baseDeliveryFee + heavyOrderSurcharge).toFixed(2));
+    const freePromo = await checkActiveFreeDelivery(subtotalUsd);
+    const finalDeliveryFee = freePromo.freeDelivery ? 0.00 : rawDeliveryFee;
 
     // 5. Internal Vehicle Recommendation (Uses Admin DB Vehicles if configured)
     let { vehicleTag, vehicleLabel } = recommendVehicle(totalWeightKg);
@@ -478,8 +481,12 @@ export async function POST(request: NextRequest) {
     // Record 2% product commission (excludes delivery fee) and lifetime phone mapping in Supabase
     try {
       await processPaidOrder(data.order);
+      await recordBundleAndPromoSales({
+        lineItems: Array.isArray(data.order.line_items) ? data.order.line_items : items,
+        orderSubtotalUsd: subtotalUsd,
+      });
     } catch (err) {
-      console.error("[EVC Checkout] Commission recording error:", err);
+      console.error("[EVC Checkout] Commission/bundle recording error:", err);
     }
 
     // Note: Do NOT return vehicle recommendation to customer-facing response

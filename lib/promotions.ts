@@ -24,6 +24,8 @@ export interface BundleRecord {
   commission_type: "DEFAULT" | "PERCENT" | "FIXED";
   commission_value: number;
   is_active: boolean;
+  shopify_product_id: string | null;
+  shopify_variant_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -43,6 +45,10 @@ export interface PromotionRecord {
   created_at: string;
 }
 
+const SHOP_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN || "quicksuuq-test.myshopify.com";
+const ACCESS_TOKEN =
+  process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || "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";
+
 let promotionsReady = false;
 
 export function slugifyBundle(title: string): string {
@@ -54,16 +60,22 @@ export function slugifyBundle(title: string): string {
   );
 }
 
+function formatItemLabel(it: BundleItem): string {
+  const qty = Number(it.qty || 1);
+  const unit = it.unit === "kg" ? `${qty} kg` : it.unit === "liter" ? `${qty} L` : qty === 1 ? "1 pc" : `${qty} pcs`;
+  return `${it.title} (${unit})`;
+}
+
 const REAL_TEST_SETS: Array<{
   id: string;
   title: string;
   description: string;
   slug: string;
-  poster_url: string;
+  poster_url: string | null;
   regular_price: number;
   bundle_price: number;
   stock: number;
-  sold_count: number;
+  shopify_variant_id: string;
   items: BundleItem[];
 }> = [
   {
@@ -71,11 +83,11 @@ const REAL_TEST_SETS: Array<{
     title: "Xirmada Qudaarta - Set A",
     description: "Ku filan 1-2 qof · 1 isbuuc · ~10 kg fresh vegetables",
     slug: "xirmada-qudaarta-set-a",
-    poster_url: "/bundles/set-a.jpg",
+    poster_url: null,
     regular_price: 12.03,
     bundle_price: 10.5,
     stock: 40,
-    sold_count: 6,
+    shopify_variant_id: "68430586184046",
     items: [
       { title: "Yaanyo Tomato", qty: 1, unitPrice: 1.0, unit: "kg" },
       { title: "Basal Cadey - Onion", qty: 1, unitPrice: 1.25, unit: "kg" },
@@ -94,11 +106,11 @@ const REAL_TEST_SETS: Array<{
     title: "Xirmada Qudaarta - Set B",
     description: "Ku filan 3-4 qof · 1 isbuuc · ~20 kg family pack",
     slug: "xirmada-qudaarta-set-b",
-    poster_url: "/bundles/set-b.jpg",
+    poster_url: null,
     regular_price: 24.31,
     bundle_price: 21.0,
     stock: 30,
-    sold_count: 4,
+    shopify_variant_id: "68430586216814",
     items: [
       { title: "Yaanyo Tomato", qty: 2, unitPrice: 1.0, unit: "kg" },
       { title: "Basal Cadey - Onion", qty: 2, unitPrice: 1.25, unit: "kg" },
@@ -122,11 +134,11 @@ const REAL_TEST_SETS: Array<{
     title: "Xirmada Qudaarta - Set C",
     description: "Ku filan 5-8 qof · 1 isbuuc · ~30 kg large family pack",
     slug: "xirmada-qudaarta-set-c",
-    poster_url: "/bundles/set-c.jpg",
+    poster_url: null,
     regular_price: 36.46,
     bundle_price: 31.5,
     stock: 20,
-    sold_count: 2,
+    shopify_variant_id: "68430586446190",
     items: [
       { title: "Yaanyo Tomato", qty: 3, unitPrice: 1.0, unit: "kg" },
       { title: "Basal Cadey - Onion", qty: 3, unitPrice: 1.25, unit: "kg" },
@@ -170,6 +182,7 @@ export async function ensurePromotionsTables(): Promise<void> {
       commission_value NUMERIC(10,2) NOT NULL DEFAULT 0,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       shopify_product_id TEXT,
+      shopify_variant_id TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -178,6 +191,7 @@ export async function ensurePromotionsTables(): Promise<void> {
   await query(`ALTER TABLE public.bundles ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''`);
   await query(`ALTER TABLE public.bundles ADD COLUMN IF NOT EXISTS promo_price NUMERIC(10,2)`);
   await query(`ALTER TABLE public.bundles ADD COLUMN IF NOT EXISTS promo_ends_at TIMESTAMPTZ`);
+  await query(`ALTER TABLE public.bundles ADD COLUMN IF NOT EXISTS shopify_variant_id TEXT`);
 
   await query(`
     CREATE TABLE IF NOT EXISTS public.promotions (
@@ -197,24 +211,22 @@ export async function ensurePromotionsTables(): Promise<void> {
   `);
 
   await query(`ALTER TABLE public.promotions ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5,2)`);
-  // Relax old check constraint if present so PERCENT_OFF is also allowed
   await query(`ALTER TABLE public.promotions DROP CONSTRAINT IF EXISTS promotions_rule_type_check`).catch(() => {});
 
   const bundleCount = await query<{ n: number }>("SELECT count(*)::int AS n FROM public.bundles");
-  const legacyCheck = await query<{ id: string; description: string; items_json: string }>(
-    `SELECT id, description, items_json FROM public.bundles WHERE id IN ('bnd_xirmada_set_a', 'bnd_xirmada_set_b', 'bnd_xirmada_set_c')`
+  const legacyVariantCheck = await query<{ id: string; shopify_variant_id: string | null }>(
+    `SELECT id, shopify_variant_id FROM public.bundles WHERE id IN ('bnd_xirmada_set_a', 'bnd_xirmada_set_b', 'bnd_xirmada_set_c')`
   );
-  const needsUnitOrDescBackfill = legacyCheck.rows.some((r) => !r.description || !r.items_json.includes('"unit"'));
+  const needsRealSync = legacyVariantCheck.rows.some((r) => !r.shopify_variant_id);
 
-  if (!bundleCount.rows[0]?.n || needsUnitOrDescBackfill) {
+  if (!bundleCount.rows[0]?.n || needsRealSync) {
     for (const s of REAL_TEST_SETS) {
       await query(
-        `INSERT INTO public.bundles (id, title, description, slug, poster_url, items_json, regular_price, bundle_price, stock, sold_count, commission_type, commission_value, is_active)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'DEFAULT', 0, TRUE)
+        `INSERT INTO public.bundles (id, title, description, slug, poster_url, items_json, regular_price, bundle_price, stock, sold_count, commission_type, commission_value, is_active, shopify_variant_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 'DEFAULT', 0, TRUE, $10)
          ON CONFLICT (id) DO UPDATE SET
-           title = EXCLUDED.title,
-           description = CASE WHEN public.bundles.description = '' THEN EXCLUDED.description ELSE public.bundles.description END,
-           items_json = EXCLUDED.items_json,
+           shopify_variant_id = COALESCE(public.bundles.shopify_variant_id, EXCLUDED.shopify_variant_id),
+           sold_count = 0,
            updated_at = NOW()`,
         [
           s.id,
@@ -226,10 +238,14 @@ export async function ensurePromotionsTables(): Promise<void> {
           s.regular_price,
           s.bundle_price,
           s.stock,
-          s.sold_count,
+          s.shopify_variant_id,
         ]
       );
     }
+    // Also reset fake starter claimed_count to 0
+    await query(
+      `UPDATE public.promotions SET claimed_count = 0 WHERE id = 'prm_first_20_free_delivery' AND claimed_count = 6`
+    );
   }
 
   const promoCount = await query<{ n: number }>("SELECT count(*)::int AS n FROM public.promotions");
@@ -237,13 +253,12 @@ export async function ensurePromotionsTables(): Promise<void> {
     const endsAt = new Date(Date.now() + 7 * 86400_000).toISOString();
     await query(
       `INSERT INTO public.promotions (id, title, rule_type, max_claims, claimed_count, min_order_usd, discount_percent, reward_type, starts_at, ends_at, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, TRUE)`,
+       VALUES ($1, $2, $3, $4, 0, $5, $6, $7, NOW(), $8, TRUE)`,
       [
         "prm_first_20_free_delivery",
         "First 20 Customers Free Delivery",
         "FIRST_N_CUSTOMERS",
         20,
-        6,
         null,
         null,
         "FREE_DELIVERY",
@@ -253,6 +268,186 @@ export async function ensurePromotionsTables(): Promise<void> {
   }
 
   promotionsReady = true;
+}
+
+export async function syncBundleToShopify(bundle: BundleRecord): Promise<{
+  shopify_product_id: string | null;
+  shopify_variant_id: string | null;
+}> {
+  if (!ACCESS_TOKEN) {
+    return { shopify_product_id: bundle.shopify_product_id, shopify_variant_id: bundle.shopify_variant_id };
+  }
+
+  const hasFlash =
+    bundle.promo_price != null &&
+    bundle.promo_price > 0 &&
+    (!bundle.promo_ends_at || new Date(bundle.promo_ends_at).getTime() > Date.now());
+  const effectivePrice = (hasFlash && bundle.promo_price ? bundle.promo_price : bundle.bundle_price).toFixed(2);
+  const compareAt =
+    bundle.regular_price > Number(effectivePrice) ? bundle.regular_price.toFixed(2) : null;
+
+  const itemsSummary = bundle.items.map(formatItemLabel).join(", ");
+  const bodyHtml = `<p>${bundle.description || "QuickSuuq Bundle"}</p>${itemsSummary ? `<p><strong>Includes:</strong> ${itemsSummary}</p>` : ""}`;
+  const validHttpsPoster =
+    bundle.poster_url && bundle.poster_url.startsWith("https://") ? bundle.poster_url : null;
+
+  try {
+    // If variant already exists, update variant price & product title/status/description
+    if (bundle.shopify_variant_id) {
+      await fetch(`https://${SHOP_DOMAIN}/admin/api/2025-01/variants/${bundle.shopify_variant_id}.json`, {
+        method: "PUT",
+        headers: { "X-Shopify-Access-Token": ACCESS_TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          variant: {
+            id: Number(bundle.shopify_variant_id),
+            price: effectivePrice,
+            compare_at_price: compareAt,
+          },
+        }),
+      });
+
+      if (bundle.shopify_product_id) {
+        await fetch(`https://${SHOP_DOMAIN}/admin/api/2025-01/products/${bundle.shopify_product_id}.json`, {
+          method: "PUT",
+          headers: { "X-Shopify-Access-Token": ACCESS_TOKEN, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            product: {
+              id: Number(bundle.shopify_product_id),
+              title: bundle.title,
+              body_html: bodyHtml,
+              status: bundle.is_active && bundle.stock > 0 ? "active" : "draft",
+            },
+          }),
+        });
+      }
+
+      return {
+        shopify_product_id: bundle.shopify_product_id,
+        shopify_variant_id: bundle.shopify_variant_id,
+      };
+    }
+
+    // Create new Shopify product for this bundle
+    const createRes = await fetch(`https://${SHOP_DOMAIN}/admin/api/2025-01/products.json`, {
+      method: "POST",
+      headers: { "X-Shopify-Access-Token": ACCESS_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product: {
+          title: bundle.title,
+          handle: bundle.slug,
+          body_html: bodyHtml,
+          vendor: "QuickSuuq",
+          product_type: "Bundle",
+          tags: "bundle, xirmo",
+          status: bundle.is_active && bundle.stock > 0 ? "active" : "draft",
+          variants: [
+            {
+              price: effectivePrice,
+              compare_at_price: compareAt,
+              inventory_management: null,
+            },
+          ],
+          ...(validHttpsPoster ? { images: [{ src: validHttpsPoster }] } : {}),
+        },
+      }),
+    });
+
+    if (createRes.ok) {
+      const created = await createRes.json();
+      const prodId = created?.product?.id ? String(created.product.id) : null;
+      const varId = created?.product?.variants?.[0]?.id ? String(created.product.variants[0].id) : null;
+      if (prodId || varId) {
+        await query(
+          `UPDATE public.bundles SET shopify_product_id = $2, shopify_variant_id = $3 WHERE id = $1`,
+          [bundle.id, prodId, varId]
+        );
+      }
+      return { shopify_product_id: prodId, shopify_variant_id: varId };
+    }
+  } catch (err) {
+    console.error("syncBundleToShopify error:", err);
+  }
+
+  return { shopify_product_id: bundle.shopify_product_id, shopify_variant_id: bundle.shopify_variant_id };
+}
+
+export async function checkActiveFreeDelivery(orderSubtotalUsd: number): Promise<{
+  freeDelivery: boolean;
+  promoId: string | null;
+  promoTitle: string | null;
+}> {
+  await ensurePromotionsTables();
+  const res = await query(
+    `SELECT * FROM public.promotions
+     WHERE is_active = TRUE
+       AND reward_type = 'FREE_DELIVERY'
+       AND (starts_at IS NULL OR starts_at <= NOW())
+       AND (ends_at IS NULL OR ends_at >= NOW())
+     ORDER BY created_at DESC`
+  );
+
+  for (const row of res.rows) {
+    const p = mapPromotionRow(row);
+    if (p.rule_type === "FIRST_N_CUSTOMERS") {
+      if (p.max_claims == null || p.claimed_count < p.max_claims) {
+        return { freeDelivery: true, promoId: p.id, promoTitle: p.title };
+      }
+    } else if (p.rule_type === "MIN_ORDER_AMOUNT") {
+      if (orderSubtotalUsd >= Number(p.min_order_usd || 0)) {
+        return { freeDelivery: true, promoId: p.id, promoTitle: p.title };
+      }
+    }
+  }
+  return { freeDelivery: false, promoId: null, promoTitle: null };
+}
+
+export async function recordBundleAndPromoSales(params: {
+  lineItems: Array<{ variant_id?: unknown; product_id?: unknown; title?: unknown; quantity?: unknown }>;
+  orderSubtotalUsd: number;
+}): Promise<void> {
+  try {
+    await ensurePromotionsTables();
+
+    for (const item of params.lineItems || []) {
+      const qty = Math.max(1, Number(item.quantity || 1));
+      const vid = item.variant_id ? String(item.variant_id) : "";
+      const pid = item.product_id ? String(item.product_id) : "";
+      const title = String(item.title || "").trim();
+
+      const match = await query<{ id: string }>(
+        `SELECT id FROM public.bundles
+         WHERE ($1 <> '' AND shopify_variant_id = $1)
+            OR ($2 <> '' AND shopify_product_id = $2)
+            OR ($3 <> '' AND LOWER(title) = LOWER($3))
+         LIMIT 1`,
+        [vid, pid, title]
+      );
+
+      if (match.rows[0]?.id) {
+        await query(
+          `UPDATE public.bundles
+           SET sold_count = sold_count + $2,
+               stock = GREATEST(0, stock - $2),
+               updated_at = NOW()
+           WHERE id = $1`,
+          [match.rows[0].id, qty]
+        );
+      }
+    }
+
+    // Claim 1 spot if a FIRST_N_CUSTOMERS promo is active
+    const promo = await checkActiveFreeDelivery(params.orderSubtotalUsd);
+    if (promo.freeDelivery && promo.promoId) {
+      await query(
+        `UPDATE public.promotions
+         SET claimed_count = claimed_count + 1
+         WHERE id = $1 AND rule_type = 'FIRST_N_CUSTOMERS' AND (max_claims IS NULL OR claimed_count < max_claims)`,
+        [promo.promoId]
+      );
+    }
+  } catch (err) {
+    console.error("recordBundleAndPromoSales error:", err);
+  }
 }
 
 export function mapBundleRow(row: Record<string, unknown>): BundleRecord {
@@ -279,6 +474,8 @@ export function mapBundleRow(row: Record<string, unknown>): BundleRecord {
     commission_type: String(row.commission_type || "DEFAULT") as BundleRecord["commission_type"],
     commission_value: Number(row.commission_value || 0),
     is_active: Boolean(row.is_active),
+    shopify_product_id: row.shopify_product_id ? String(row.shopify_product_id) : null,
+    shopify_variant_id: row.shopify_variant_id ? String(row.shopify_variant_id) : null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };
@@ -293,7 +490,7 @@ export function mapPromotionRow(row: Record<string, unknown>): PromotionRecord {
     claimed_count: Number(row.claimed_count || 0),
     min_order_usd: row.min_order_usd != null ? Number(row.min_order_usd) : null,
     discount_percent: row.discount_percent != null ? Number(row.discount_percent) : null,
-    reward_type: (row.reward_type === "PERCENT_OFF" ? "PERCENT_OFF" : "FREE_DELIVERY"),
+    reward_type: row.reward_type === "PERCENT_OFF" ? "PERCENT_OFF" : "FREE_DELIVERY",
     starts_at: row.starts_at ? String(row.starts_at) : null,
     ends_at: row.ends_at ? String(row.ends_at) : null,
     is_active: Boolean(row.is_active),
