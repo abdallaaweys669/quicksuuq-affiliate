@@ -36,6 +36,7 @@ export interface DeliverySettings {
 }
 
 let initialized = false;
+let deliveryInitPromise: Promise<void> | null = null;
 
 const INITIAL_AREAS = [
   // Category A ($1.50)
@@ -80,6 +81,30 @@ const INITIAL_DRIVERS = [
 
 export async function ensureDeliveryTables() {
   if (initialized) return;
+  if (!deliveryInitPromise) {
+    deliveryInitPromise = initDeliveryTables().finally(() => {
+      deliveryInitPromise = null;
+    });
+  }
+  return deliveryInitPromise;
+}
+
+async function initDeliveryTables() {
+  if (initialized) return;
+
+  // Fast path: if all tables already exist, skip concurrent DDL across serverless instances
+  const existsRes = await query<{ a: boolean; v: boolean; d: boolean; s: boolean }>(
+    `SELECT
+       to_regclass('public.delivery_areas') IS NOT NULL AS a,
+       to_regclass('public.delivery_vehicles') IS NOT NULL AS v,
+       to_regclass('public.delivery_drivers') IS NOT NULL AS d,
+       to_regclass('public.delivery_settings') IS NOT NULL AS s`
+  );
+  const exists = existsRes.rows[0];
+  if (exists?.a && exists?.v && exists?.d && exists?.s) {
+    initialized = true;
+    return;
+  }
 
   await query(`
     CREATE TABLE IF NOT EXISTS delivery_areas (

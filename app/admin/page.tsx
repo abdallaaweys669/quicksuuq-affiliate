@@ -478,17 +478,26 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function adminFetchRetry(url: string) {
+    const res = await adminFetch(url);
+    if (!res.ok && res.status >= 500) {
+      await new Promise((r) => setTimeout(r, 350));
+      return adminFetch(url);
+    }
+    return res;
+  }
+
   async function loadAllData() {
     try {
       const [repsRes, commsRes, paysRes, delivRes, ordsRes, sfRes, promoRes, bnrRes] = await Promise.all([
-        adminFetch("/api/admin/salespeople"),
-        adminFetch("/api/admin/commissions"),
-        adminFetch("/api/admin/payouts"),
-        adminFetch("/api/admin/delivery"),
-        adminFetch("/api/admin/orders"),
-        adminFetch("/api/admin/storefront"),
-        adminFetch("/api/admin/promotions"),
-        adminFetch("/api/admin/bundle-banners"),
+        adminFetchRetry("/api/admin/salespeople"),
+        adminFetchRetry("/api/admin/commissions"),
+        adminFetchRetry("/api/admin/payouts"),
+        adminFetchRetry("/api/admin/delivery"),
+        adminFetchRetry("/api/admin/orders"),
+        adminFetchRetry("/api/admin/storefront"),
+        adminFetchRetry("/api/admin/promotions"),
+        adminFetchRetry("/api/admin/bundle-banners"),
       ]);
       if (repsRes.ok) {
         const d = await repsRes.json();

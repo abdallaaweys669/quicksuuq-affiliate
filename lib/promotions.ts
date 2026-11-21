@@ -74,6 +74,7 @@ const ACCESS_TOKEN =
   process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || "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";
 
 let promotionsReady = false;
+let promotionsInitPromise: Promise<void> | null = null;
 
 export function slugifyBundle(title: string): string {
   return (
@@ -187,6 +188,29 @@ const REAL_TEST_SETS: Array<{
 
 export async function ensurePromotionsTables(): Promise<void> {
   if (promotionsReady) return;
+  if (!promotionsInitPromise) {
+    promotionsInitPromise = initPromotionsTables().finally(() => {
+      promotionsInitPromise = null;
+    });
+  }
+  return promotionsInitPromise;
+}
+
+async function initPromotionsTables(): Promise<void> {
+  if (promotionsReady) return;
+
+  // Fast path: if all tables already exist, skip concurrent DDL across serverless instances
+  const existsRes = await query<{ b: boolean; p: boolean; bb: boolean }>(
+    `SELECT
+       to_regclass('public.bundles') IS NOT NULL AS b,
+       to_regclass('public.promotions') IS NOT NULL AS p,
+       to_regclass('public.bundle_banners') IS NOT NULL AS bb`
+  );
+  const exists = existsRes.rows[0];
+  if (exists?.b && exists?.p && exists?.bb) {
+    promotionsReady = true;
+    return;
+  }
 
   await query(`
     CREATE TABLE IF NOT EXISTS public.bundles (
