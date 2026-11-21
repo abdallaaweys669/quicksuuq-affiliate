@@ -20,7 +20,7 @@ export async function GET() {
   try {
     await ensurePromotionsTables();
 
-    const [bRes, pRes, bnRes] = await Promise.all([
+    const [bRes, pRes, bnRes, mqRes] = await Promise.all([
       query(
         `SELECT * FROM public.bundles
          WHERE is_active = TRUE AND stock > 0
@@ -43,24 +43,36 @@ export async function GET() {
          WHERE is_active = TRUE
          ORDER BY sort_order ASC, created_at DESC`
       ),
+      query<{ value: string }>(
+        `SELECT value FROM public.site_settings WHERE key = 'top_marquee_text' LIMIT 1`
+      ),
     ]);
 
     const bundles = bRes.rows.map(mapBundleRow);
     const bundlesById = new Map(bundles.map((b) => [b.id, b]));
+    const specialTargets = new Set(["ALL_BUNDLES", "PRODUCT", "INFO_ONLY"]);
     const bundleBanners = bnRes.rows
       .map(mapBannerRow)
       .map((bn) => ({
         ...bn,
-        target_type: bn.bundle_id === "ALL_BUNDLES" ? "all_bundles" : "bundle",
-        bundle: bn.bundle_id === "ALL_BUNDLES" ? null : bundlesById.get(bn.bundle_id) || null,
+        target_type:
+          bn.bundle_id === "ALL_BUNDLES"
+            ? "all_bundles"
+            : bn.bundle_id === "PRODUCT"
+            ? "product"
+            : bn.bundle_id === "INFO_ONLY"
+            ? "info"
+            : "bundle",
+        bundle: specialTargets.has(bn.bundle_id) ? null : bundlesById.get(bn.bundle_id) || null,
       }))
-      .filter((bn) => bn.bundle_id === "ALL_BUNDLES" || bn.bundle !== null);
+      .filter((bn) => specialTargets.has(bn.bundle_id) || bn.bundle !== null);
 
     return NextResponse.json(
       {
         bundles,
         promotions: pRes.rows.map(mapPromotionRow),
         bundle_banners: bundleBanners,
+        marquee_text: mqRes.rows[0]?.value ?? "",
       },
       {
         headers: {

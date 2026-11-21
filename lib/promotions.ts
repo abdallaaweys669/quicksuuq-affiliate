@@ -46,6 +46,7 @@ export interface BannerElementConfig {
 export interface BundleBannerRecord {
   id: string;
   bundle_id: string;
+  link_url?: string | null;
   bg_image: string | null;
   bg_color: string;
   elements: BannerElementConfig[];
@@ -199,15 +200,20 @@ export async function ensurePromotionsTables(): Promise<void> {
 async function initPromotionsTables(): Promise<void> {
   if (promotionsReady) return;
 
-  // Fast path: if all tables already exist, skip concurrent DDL across serverless instances
-  const existsRes = await query<{ b: boolean; p: boolean; bb: boolean }>(
+  // Fast path: if all tables & columns already exist, skip concurrent DDL across serverless instances
+  const existsRes = await query<{ b: boolean; p: boolean; bb: boolean; ss: boolean; lu: boolean }>(
     `SELECT
        to_regclass('public.bundles') IS NOT NULL AS b,
        to_regclass('public.promotions') IS NOT NULL AS p,
-       to_regclass('public.bundle_banners') IS NOT NULL AS bb`
+       to_regclass('public.bundle_banners') IS NOT NULL AS bb,
+       to_regclass('public.site_settings') IS NOT NULL AS ss,
+       EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'bundle_banners' AND column_name = 'link_url'
+       ) AS lu`
   );
   const exists = existsRes.rows[0];
-  if (exists?.b && exists?.p && exists?.bb) {
+  if (exists?.b && exists?.p && exists?.bb && exists?.ss && exists?.lu) {
     promotionsReady = true;
     return;
   }
@@ -265,12 +271,22 @@ async function initPromotionsTables(): Promise<void> {
     CREATE TABLE IF NOT EXISTS public.bundle_banners (
       id TEXT PRIMARY KEY,
       bundle_id TEXT NOT NULL,
+      link_url TEXT,
       bg_image TEXT,
       bg_color TEXT NOT NULL DEFAULT '#0e8a60',
       elements_json TEXT NOT NULL DEFAULT '[]',
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await query(`ALTER TABLE public.bundle_banners ADD COLUMN IF NOT EXISTS link_url TEXT`);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS public.site_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
 
@@ -609,6 +625,7 @@ export function mapBannerRow(row: Record<string, unknown>): BundleBannerRecord {
   return {
     id: String(row.id),
     bundle_id: String(row.bundle_id),
+    link_url: row.link_url ? String(row.link_url) : null,
     bg_image: row.bg_image ? String(row.bg_image) : null,
     bg_color: String(row.bg_color || "#0e8a60"),
     elements,

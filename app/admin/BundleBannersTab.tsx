@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BannerElementConfig, BundleBannerRecord, BundleRecord } from "@/lib/promotions";
 
 interface BundleBannersTabProps {
@@ -99,35 +99,55 @@ export default function BundleBannersTab({
 }: BundleBannersTabProps) {
   const [editing, setEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [bundleId, setBundleId] = useState<string>(bundles[0]?.id || "");
+  const [bundleId, setBundleId] = useState<string>(bundles[0]?.id || "ALL_BUNDLES");
+  const [linkUrl, setLinkUrl] = useState<string>("");
   const [bgImage, setBgImage] = useState<string>("");
   const [bgColor, setBgColor] = useState<string>("#0e8a60");
   const [elements, setElements] = useState<BannerElementConfig[]>(defaultElements(bundles[0]));
-  const [selectedId, setSelectedId] = useState<BannerElementConfig["id"]>("title");
+  const [selectedIds, setSelectedIds] = useState<BannerElementConfig["id"][]>(["title"]);
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [marqueeText, setMarqueeText] = useState<string>("");
+  const [savingMarquee, setSavingMarquee] = useState(false);
+  const [storeProducts, setStoreProducts] = useState<Array<{ title: string; handle: string; price: string; compare_at_price?: string | null }>>([]);
+
+  useEffect(() => {
+    adminFetch("/api/admin/bundle-banners")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && typeof d.marquee_text === "string") setMarqueeText(d.marquee_text);
+      })
+      .catch(() => {});
+    adminFetch("/api/admin/products")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && Array.isArray(d.products)) setStoreProducts(d.products);
+      })
+      .catch(() => {});
+  }, []);
+
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef<{
-    id: BannerElementConfig["id"];
     startX: number;
     startY: number;
-    origX: number;
-    origY: number;
+    origPositions: Array<{ id: BannerElementConfig["id"]; x: number; y: number }>;
   } | null>(null);
 
-  const isAllBundles = bundleId === "ALL_BUNDLES";
-  const linkedBundle = isAllBundles ? undefined : bundles.find((b) => b.id === bundleId);
-  const selectedEl = elements.find((e) => e.id === selectedId) || elements[0];
+  const isSpecialTarget = bundleId === "ALL_BUNDLES" || bundleId === "PRODUCT" || bundleId === "INFO_ONLY";
+  const linkedBundle = isSpecialTarget ? undefined : bundles.find((b) => b.id === bundleId);
+  const primarySelectedId = selectedIds[selectedIds.length - 1] || "title";
+  const selectedEl = elements.find((e) => e.id === primarySelectedId) || elements[0];
 
   function openNew() {
     const first = bundles[0];
     setEditingId(null);
-    setBundleId(first?.id || "");
+    setBundleId(first?.id || "ALL_BUNDLES");
+    setLinkUrl("");
     setBgImage("");
     setBgColor("#0e8a60");
     setElements(defaultElements(first));
-    setSelectedId("title");
+    setSelectedIds(["title"]);
     setIsActive(true);
     setEditing(true);
   }
@@ -135,10 +155,11 @@ export default function BundleBannersTab({
   function openEdit(bn: BundleBannerRecord) {
     setEditingId(bn.id);
     setBundleId(bn.bundle_id);
+    setLinkUrl(bn.link_url || "");
     setBgImage(bn.bg_image || "");
     setBgColor(bn.bg_color || "#0e8a60");
     setElements(bn.elements.length > 0 ? bn.elements : defaultElements(bundles.find((b) => b.id === bn.bundle_id)));
-    setSelectedId("title");
+    setSelectedIds(["title"]);
     setIsActive(bn.is_active);
     setEditing(true);
   }
@@ -147,15 +168,65 @@ export default function BundleBannersTab({
     setElements((prev) => prev.map((el) => (el.id === id ? { ...el, ...patch } : el)));
   }
 
+  function alignSelected(mode: "left" | "center" | "right" | "top" | "middle" | "bottom" | "stack") {
+    if (selectedIds.length === 0) return;
+    setElements((prev) => {
+      const sel = prev.filter((e) => selectedIds.includes(e.id));
+      if (sel.length === 0) return prev;
+      const minX = Math.min(...sel.map((s) => s.x));
+      const maxX = Math.max(...sel.map((s) => s.x));
+      const minY = Math.min(...sel.map((s) => s.y));
+      const maxY = Math.max(...sel.map((s) => s.y));
+
+      if (mode === "stack") {
+        const sorted = [...sel].sort((a, b) => a.y - b.y);
+        const startY = sorted[0].y;
+        const posMap = new Map<string, { x: number; y: number }>();
+        sorted.forEach((s, idx) => {
+          posMap.set(s.id, { x: minX, y: Math.min(84, startY + idx * 17) });
+        });
+        return prev.map((e) => (posMap.has(e.id) ? { ...e, ...posMap.get(e.id)! } : e));
+      }
+
+      return prev.map((e) => {
+        if (!selectedIds.includes(e.id)) return e;
+        if (mode === "left") return { ...e, x: sel.length > 1 ? minX : 6 };
+        if (mode === "center") return { ...e, x: 38 };
+        if (mode === "right") return { ...e, x: sel.length > 1 ? maxX : 68 };
+        if (mode === "top") return { ...e, y: sel.length > 1 ? minY : 12 };
+        if (mode === "middle") return { ...e, y: 44 };
+        if (mode === "bottom") return { ...e, y: sel.length > 1 ? maxY : 74 };
+        return e;
+      });
+    });
+  }
+
   function onPointerDownElement(e: React.PointerEvent, el: BannerElementConfig) {
     e.stopPropagation();
-    setSelectedId(el.id);
+    const isMultiKey = e.shiftKey || e.ctrlKey || e.metaKey;
+    let nextSelected: BannerElementConfig["id"][];
+    if (isMultiKey) {
+      if (selectedIds.includes(el.id)) {
+        nextSelected = selectedIds.length > 1 ? selectedIds.filter((id) => id !== el.id) : selectedIds;
+      } else {
+        nextSelected = [...selectedIds, el.id];
+      }
+      setSelectedIds(nextSelected);
+    } else if (selectedIds.includes(el.id)) {
+      nextSelected = selectedIds;
+    } else {
+      nextSelected = [el.id];
+      setSelectedIds(nextSelected);
+    }
+
+    const origPositions = elements
+      .filter((item) => nextSelected.includes(item.id))
+      .map((item) => ({ id: item.id, x: item.x, y: item.y }));
+
     draggingRef.current = {
-      id: el.id,
       startX: e.clientX,
       startY: e.clientY,
-      origX: el.x,
-      origY: el.y,
+      origPositions,
     };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
@@ -166,9 +237,16 @@ export default function BundleBannersTab({
     if (!d || !box) return;
     const dxPct = ((e.clientX - d.startX) / box.width) * 100;
     const dyPct = ((e.clientY - d.startY) / box.height) * 100;
-    const nextX = Math.max(2, Math.min(85, Math.round((d.origX + dxPct) * 10) / 10));
-    const nextY = Math.max(4, Math.min(86, Math.round((d.origY + dyPct) * 10) / 10));
-    updateElement(d.id, { x: nextX, y: nextY });
+    const posMap = new Map<string, { x: number; y: number }>();
+    for (const orig of d.origPositions) {
+      posMap.set(orig.id, {
+        x: Math.max(2, Math.min(85, Math.round((orig.x + dxPct) * 10) / 10)),
+        y: Math.max(4, Math.min(86, Math.round((orig.y + dyPct) * 10) / 10)),
+      });
+    }
+    setElements((prev) =>
+      prev.map((item) => (posMap.has(item.id) ? { ...item, ...posMap.get(item.id)! } : item))
+    );
   }
 
   function onPointerUpElement() {
@@ -188,6 +266,7 @@ export default function BundleBannersTab({
         body: JSON.stringify({
           id: editingId || undefined,
           bundle_id: bundleId,
+          link_url: isSpecialTarget ? (linkUrl.trim() || null) : null,
           bg_image: bgImage.trim() || null,
           bg_color: bgColor,
           elements,
@@ -259,29 +338,92 @@ export default function BundleBannersTab({
                 const nextId = e.target.value;
                 setBundleId(nextId);
                 if (nextId === "ALL_BUNDLES") {
+                  setLinkUrl("/pages/bundles");
                   updateElement("title", { text: "Shop All Bundles" });
                   updateElement("subtitle", { text: "Explore all fresh combo packs & save" });
-                  updateElement("button", { text: "View All Bundles" });
+                  updateElement("button", { text: "View All Bundles", visible: true });
+                  return;
+                }
+                if (nextId === "PRODUCT") {
+                  updateElement("title", { text: "Special Discounted Item" });
+                  updateElement("subtitle", { text: "Limited time store offer" });
+                  updateElement("button", { text: "Shop Product", visible: true });
+                  return;
+                }
+                if (nextId === "INFO_ONLY") {
+                  setLinkUrl("");
+                  updateElement("title", { text: "QuickSuuq Mobile App" });
+                  updateElement("subtitle", { text: "Fast Mogadishu delivery · Pay with EVC Plus" });
+                  updateElement("button", { text: "Learn More", visible: true });
                   return;
                 }
                 const found = bundles.find((b) => b.id === nextId);
                 if (found) {
                   updateElement("title", { text: found.title });
                   if (found.description) updateElement("subtitle", { text: found.description });
-                  updateElement("button", { text: "Buy Now" });
+                  updateElement("button", { text: "Buy Now", visible: true });
                 }
               }}
             >
               <option value="ALL_BUNDLES">All Bundles Page (/pages/bundles)</option>
+              <option value="PRODUCT">Discounted Product (Link to Product)</option>
+              <option value="INFO_ONLY">Text & Image Banner Only (App / Info / Custom URL)</option>
               {bundles.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.title} (${b.bundle_price.toFixed(2)})
+                  Bundle: {b.title} (${b.bundle_price.toFixed(2)})
                 </option>
               ))}
             </select>
+
+            {bundleId === "PRODUCT" && (
+              <div style={{ marginTop: "6px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                {storeProducts.length > 0 && (
+                  <select
+                    style={inputStyle}
+                    value={linkUrl}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setLinkUrl(val);
+                      const matched = storeProducts.find((p) => `/products/${p.handle}` === val);
+                      if (matched) {
+                        updateElement("title", { text: matched.title });
+                        updateElement("subtitle", { text: `Now only $${matched.price}${matched.compare_at_price ? ` (was $${matched.compare_at_price})` : ""}` });
+                      }
+                    }}
+                  >
+                    <option value="">Select a product...</option>
+                    {storeProducts.map((p) => (
+                      <option key={p.handle} value={`/products/${p.handle}`}>
+                        {p.title} (${p.price})
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <input
+                  style={inputStyle}
+                  placeholder="/products/product-handle"
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                />
+              </div>
+            )}
+
+            {bundleId === "INFO_ONLY" && (
+              <input
+                style={{ ...inputStyle, marginTop: "6px" }}
+                placeholder="Optional link URL (e.g. /collections/all or leave blank)"
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+              />
+            )}
+
             <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "4px" }}>
-              {isAllBundles
+              {bundleId === "ALL_BUNDLES"
                 ? "Clicking the button opens /pages/bundles (all bundles)."
+                : bundleId === "PRODUCT"
+                ? "Links directly to the selected discounted product page."
+                : bundleId === "INFO_ONLY"
+                ? "Pure image/text promo banner (link URL is optional)."
                 : "Auto-removed if this bundle is deleted."}
             </div>
           </div>
@@ -320,6 +462,26 @@ export default function BundleBannersTab({
           </div>
         </div>
 
+        {/* MULTI-SELECT & ALIGNMENT TOOLBAR */}
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "#f8fafc", padding: "8px 12px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+          <span style={{ fontSize: "12px", color: "#475569", fontWeight: 600 }}>
+            Selected: {selectedIds.length} item{selectedIds.length > 1 ? "s" : ""} (Shift+Click or Ctrl+Click to multi-select & drag together)
+          </span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            <button type="button" className="btn-small" onClick={() => alignSelected("left")}>Align Left</button>
+            <button type="button" className="btn-small" onClick={() => alignSelected("center")}>Center H</button>
+            <button type="button" className="btn-small" onClick={() => alignSelected("right")}>Align Right</button>
+            <button type="button" className="btn-small" onClick={() => alignSelected("top")}>Top</button>
+            <button type="button" className="btn-small" onClick={() => alignSelected("middle")}>Middle V</button>
+            <button type="button" className="btn-small" onClick={() => alignSelected("bottom")}>Bottom</button>
+            {selectedIds.length > 1 && (
+              <button type="button" className="btn-small" style={{ fontWeight: 700, color: "#008060" }} onClick={() => alignSelected("stack")}>
+                Stack Left Evenly
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* DRAG & DROP LIVE CANVAS */}
         <div
           ref={canvasRef}
@@ -341,7 +503,7 @@ export default function BundleBannersTab({
         >
           {elements.map((el) => {
             if (!el.visible) return null;
-            const isSel = selectedId === el.id;
+            const isSel = selectedIds.includes(el.id);
             const commonStyle: React.CSSProperties = {
               position: "absolute",
               left: `${el.x}%`,
@@ -360,7 +522,7 @@ export default function BundleBannersTab({
             };
 
             if (el.id === "price") {
-              if (isAllBundles) return null;
+              if (isSpecialTarget) return null;
               return (
                 <div
                   key={el.id}
@@ -481,24 +643,61 @@ export default function BundleBannersTab({
     );
   }
 
+  async function saveMarquee() {
+    setSavingMarquee(true);
+    try {
+      const res = await adminFetch("/api/admin/bundle-banners", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ marquee_text: marqueeText }),
+      });
+      if (res.ok) onFeedback("Top marquee text saved!");
+    } finally {
+      setSavingMarquee(false);
+    }
+  }
+
   return (
     <div style={{ padding: "12px 4px 20px" }}>
+      {/* TOP MARQUEE TEXT EDITOR */}
+      <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "12px 14px", marginBottom: "16px" }}>
+        <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>
+          Top-of-Site Scrolling Marquee Text
+        </label>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+          <input
+            style={{ ...inputStyle, flex: 1, minWidth: "240px" }}
+            placeholder="e.g. Fast Mogadishu Delivery · Pay easily with EVC Plus · Fresh Daily Produce"
+            value={marqueeText}
+            onChange={(e) => setMarqueeText(e.target.value)}
+          />
+          <button type="button" style={blackBtnStyle} disabled={savingMarquee} onClick={saveMarquee}>
+            {savingMarquee ? "Saving..." : "Save Marquee"}
+          </button>
+        </div>
+        <div style={{ fontSize: "11.5px", color: "#64748b", marginTop: "4px" }}>
+          Scrolls at the very top of your website alongside active promotions (like First 20 Customers Free Delivery).
+        </div>
+      </div>
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
         <p style={{ margin: 0, fontSize: "13px", color: "#6b7280" }}>
-          Design slideable Home Page Bundle Banners with drag-and-drop text, fonts, prices & Buy Now buttons.
+          Design slideable Top Banners (bundles, discounted products, or app/store promo slides) with drag-and-drop text & buttons.
         </p>
         <button type="button" style={blackBtnStyle} onClick={openNew}>
-          + New Bundle Banner
+          + New Top Banner
         </button>
       </div>
 
       {banners.length === 0 ? (
-        <div className="empty-state">No bundle banners yet. Click <strong>+ New Bundle Banner</strong> to design one.</div>
+        <div className="empty-state">No top banners yet. Click <strong>+ New Top Banner</strong> to design one.</div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "14px" }}>
           {banners.map((bn) => {
             const isAll = bn.bundle_id === "ALL_BUNDLES";
-            const b = isAll ? null : bundles.find((x) => x.id === bn.bundle_id);
+            const isProd = bn.bundle_id === "PRODUCT";
+            const isInfo = bn.bundle_id === "INFO_ONLY";
+            const b = (isAll || isProd || isInfo) ? null : bundles.find((x) => x.id === bn.bundle_id);
             const titleEl = bn.elements?.find((e) => e.id === "title");
             return (
               <div key={bn.id} style={{ border: "1px solid #e5e7eb", borderRadius: "12px", overflow: "hidden", background: "#fff" }}>
@@ -516,10 +715,18 @@ export default function BundleBannersTab({
                     justifyContent: "center",
                   }}
                 >
-                  <div style={{ fontSize: "16px", fontWeight: 800 }}>{b?.title || titleEl?.text || "Bundle Banner"}</div>
+                  <div style={{ fontSize: "16px", fontWeight: 800 }}>{b?.title || titleEl?.text || "Top Banner"}</div>
                   {isAll ? (
                     <div style={{ fontSize: "12.5px", marginTop: "4px", opacity: 0.92 }}>
                       Links to /pages/bundles (All Bundles)
+                    </div>
+                  ) : isProd ? (
+                    <div style={{ fontSize: "12.5px", marginTop: "4px", opacity: 0.92 }}>
+                      Product Link: {bn.link_url || "Not set"}
+                    </div>
+                  ) : isInfo ? (
+                    <div style={{ fontSize: "12.5px", marginTop: "4px", opacity: 0.92 }}>
+                      Info / App Banner {bn.link_url ? `→ ${bn.link_url}` : "(Display only)"}
                     </div>
                   ) : b ? (
                     <div style={{ fontSize: "13px", marginTop: "4px" }}>

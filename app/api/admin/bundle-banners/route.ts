@@ -15,11 +15,17 @@ export async function GET() {
 
     await query(
       `DELETE FROM public.bundle_banners
-       WHERE bundle_id <> 'ALL_BUNDLES'
+       WHERE bundle_id NOT IN ('ALL_BUNDLES', 'PRODUCT', 'INFO_ONLY')
          AND bundle_id NOT IN (SELECT id FROM public.bundles)`
     );
-    const res = await query("SELECT * FROM public.bundle_banners ORDER BY sort_order ASC, created_at DESC");
-    return NextResponse.json({ banners: res.rows.map(mapBannerRow) });
+    const [res, mqRes] = await Promise.all([
+      query("SELECT * FROM public.bundle_banners ORDER BY sort_order ASC, created_at DESC"),
+      query<{ value: string }>("SELECT value FROM public.site_settings WHERE key = 'top_marquee_text' LIMIT 1"),
+    ]);
+    return NextResponse.json({
+      banners: res.rows.map(mapBannerRow),
+      marquee_text: mqRes.rows[0]?.value ?? "",
+    });
   } catch (err) {
     console.error("GET /api/admin/bundle-banners failed:", err);
     return NextResponse.json({ error: "Failed to load banners" }, { status: 500 });
@@ -38,16 +44,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "bundle_id is required" }, { status: 400 });
     }
     const id = `bnr_${randomUUID().slice(0, 8)}`;
+    const linkUrl = body.link_url ? String(body.link_url).trim() : null;
     const bgImage = body.bg_image ? String(body.bg_image).trim() : null;
     const bgColor = String(body.bg_color || "#0e8a60");
     const elements = Array.isArray(body.elements) ? body.elements : [];
     const isActive = body.is_active !== false;
 
     const ins = await query(
-      `INSERT INTO public.bundle_banners (id, bundle_id, bg_image, bg_color, elements_json, is_active, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, 0)
+      `INSERT INTO public.bundle_banners (id, bundle_id, link_url, bg_image, bg_color, elements_json, is_active, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 0)
        RETURNING *`,
-      [id, bundleId, bgImage, bgColor, JSON.stringify(elements), isActive]
+      [id, bundleId, linkUrl, bgImage, bgColor, JSON.stringify(elements), isActive]
     );
     return NextResponse.json({ banner: mapBannerRow(ins.rows[0]) }, { status: 201 });
   } catch (err) {
@@ -71,6 +78,7 @@ export async function PATCH(request: NextRequest) {
     const cur = mapBannerRow(existing.rows[0]);
 
     const bundleId = body.bundle_id != null ? String(body.bundle_id) : cur.bundle_id;
+    const linkUrl = body.link_url !== undefined ? (body.link_url ? String(body.link_url).trim() : null) : cur.link_url ?? null;
     const bgImage = body.bg_image !== undefined ? (body.bg_image ? String(body.bg_image).trim() : null) : cur.bg_image;
     const bgColor = body.bg_color != null ? String(body.bg_color) : cur.bg_color;
     const elements = Array.isArray(body.elements) ? body.elements : cur.elements;
@@ -78,15 +86,36 @@ export async function PATCH(request: NextRequest) {
 
     const upd = await query(
       `UPDATE public.bundle_banners
-       SET bundle_id = $2, bg_image = $3, bg_color = $4, elements_json = $5, is_active = $6
+       SET bundle_id = $2, link_url = $3, bg_image = $4, bg_color = $5, elements_json = $6, is_active = $7
        WHERE id = $1
        RETURNING *`,
-      [id, bundleId, bgImage, bgColor, JSON.stringify(elements), isActive]
+      [id, bundleId, linkUrl, bgImage, bgColor, JSON.stringify(elements), isActive]
     );
     return NextResponse.json({ banner: mapBannerRow(upd.rows[0]) });
   } catch (err) {
     console.error("PATCH /api/admin/bundle-banners failed:", err);
     return NextResponse.json({ error: "Failed to update banner" }, { status: 500 });
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const admin = await getAdminSession();
+    if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    await ensurePromotionsTables();
+
+    const body = await request.json();
+    const marqueeText = String(body.marquee_text ?? "").trim();
+    await query(
+      `INSERT INTO public.site_settings (key, value, updated_at)
+       VALUES ('top_marquee_text', $1, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [marqueeText]
+    );
+    return NextResponse.json({ success: true, marquee_text: marqueeText });
+  } catch (err) {
+    console.error("PUT /api/admin/bundle-banners failed:", err);
+    return NextResponse.json({ error: "Failed to save marquee text" }, { status: 500 });
   }
 }
 
