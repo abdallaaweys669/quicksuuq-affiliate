@@ -116,7 +116,8 @@ export default function BundleBannersTab({
     origY: number;
   } | null>(null);
 
-  const linkedBundle = bundles.find((b) => b.id === bundleId) || bundles[0];
+  const isAllBundles = bundleId === "ALL_BUNDLES";
+  const linkedBundle = isAllBundles ? undefined : bundles.find((b) => b.id === bundleId);
   const selectedEl = elements.find((e) => e.id === selectedId) || elements[0];
 
   function openNew() {
@@ -250,26 +251,39 @@ export default function BundleBannersTab({
         {/* Bundle & Background Controls */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", background: "#f9fafb", padding: "14px", borderRadius: "10px", border: "1px solid #e5e7eb" }}>
           <div>
-            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>Linked Bundle</label>
+            <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>Link Banner To</label>
             <select
               style={inputStyle}
               value={bundleId}
               onChange={(e) => {
                 const nextId = e.target.value;
                 setBundleId(nextId);
+                if (nextId === "ALL_BUNDLES") {
+                  updateElement("title", { text: "Shop All Bundles" });
+                  updateElement("subtitle", { text: "Explore all fresh combo packs & save" });
+                  updateElement("button", { text: "View All Bundles" });
+                  return;
+                }
                 const found = bundles.find((b) => b.id === nextId);
                 if (found) {
                   updateElement("title", { text: found.title });
                   if (found.description) updateElement("subtitle", { text: found.description });
+                  updateElement("button", { text: "Buy Now" });
                 }
               }}
             >
+              <option value="ALL_BUNDLES">All Bundles Page (/pages/bundles)</option>
               {bundles.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.title} (${b.bundle_price.toFixed(2)})
                 </option>
               ))}
             </select>
+            <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "4px" }}>
+              {isAllBundles
+                ? "Clicking the button opens /pages/bundles (all bundles)."
+                : "Auto-removed if this bundle is deleted."}
+            </div>
           </div>
 
           <div>
@@ -299,6 +313,9 @@ export default function BundleBannersTab({
                   }}
                 />
               </label>
+            </div>
+            <div style={{ fontSize: "11px", color: "#008060", fontWeight: 600, marginTop: "4px" }}>
+              Recommended size: 1200 × 280 px (4:1 wide banner, JPG/PNG/WebP)
             </div>
           </div>
         </div>
@@ -343,6 +360,7 @@ export default function BundleBannersTab({
             };
 
             if (el.id === "price") {
+              if (isAllBundles) return null;
               return (
                 <div
                   key={el.id}
@@ -479,7 +497,9 @@ export default function BundleBannersTab({
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "14px" }}>
           {banners.map((bn) => {
-            const b = bundles.find((x) => x.id === bn.bundle_id);
+            const isAll = bn.bundle_id === "ALL_BUNDLES";
+            const b = isAll ? null : bundles.find((x) => x.id === bn.bundle_id);
+            const titleEl = bn.elements?.find((e) => e.id === "title");
             return (
               <div key={bn.id} style={{ border: "1px solid #e5e7eb", borderRadius: "12px", overflow: "hidden", background: "#fff" }}>
                 <div
@@ -496,12 +516,16 @@ export default function BundleBannersTab({
                     justifyContent: "center",
                   }}
                 >
-                  <div style={{ fontSize: "16px", fontWeight: 800 }}>{b?.title || "Bundle Banner"}</div>
-                  {b && (
+                  <div style={{ fontSize: "16px", fontWeight: 800 }}>{b?.title || titleEl?.text || "Bundle Banner"}</div>
+                  {isAll ? (
+                    <div style={{ fontSize: "12.5px", marginTop: "4px", opacity: 0.92 }}>
+                      Links to /pages/bundles (All Bundles)
+                    </div>
+                  ) : b ? (
                     <div style={{ fontSize: "13px", marginTop: "4px" }}>
                       ${b.bundle_price.toFixed(2)} {b.regular_price > b.bundle_price ? `(was $${b.regular_price.toFixed(2)})` : ""}
                     </div>
-                  )}
+                  ) : null}
                 </div>
                 <div style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f9fafb", borderTop: "1px solid #e5e7eb" }}>
                   <span style={{ fontSize: "12px", fontWeight: 600, color: bn.is_active ? "#008060" : "#6b7280" }}>

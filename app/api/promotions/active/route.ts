@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { ensurePromotionsTables, mapBannerRow, mapBundleRow, mapPromotionRow } from "@/lib/promotions";
 
@@ -51,9 +51,10 @@ export async function GET() {
       .map(mapBannerRow)
       .map((bn) => ({
         ...bn,
-        bundle: bundlesById.get(bn.bundle_id) || null,
+        target_type: bn.bundle_id === "ALL_BUNDLES" ? "all_bundles" : "bundle",
+        bundle: bn.bundle_id === "ALL_BUNDLES" ? null : bundlesById.get(bn.bundle_id) || null,
       }))
-      .filter((bn) => bn.bundle !== null);
+      .filter((bn) => bn.bundle_id === "ALL_BUNDLES" || bn.bundle !== null);
 
     return NextResponse.json(
       {

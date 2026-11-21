@@ -13,6 +13,11 @@ export async function GET() {
     if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     await ensurePromotionsTables();
 
+    await query(
+      `DELETE FROM public.bundle_banners
+       WHERE bundle_id <> 'ALL_BUNDLES'
+         AND bundle_id NOT IN (SELECT id FROM public.bundles)`
+    );
     const res = await query("SELECT * FROM public.bundle_banners ORDER BY sort_order ASC, created_at DESC");
     return NextResponse.json({ banners: res.rows.map(mapBannerRow) });
   } catch (err) {

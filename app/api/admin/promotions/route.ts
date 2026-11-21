@@ -253,6 +253,7 @@ export async function DELETE(request: NextRequest) {
     if (kind === "promo") {
       await query("DELETE FROM public.promotions WHERE id = $1", [id]);
     } else {
+      await query("DELETE FROM public.bundle_banners WHERE bundle_id = $1", [id]);
       await query("DELETE FROM public.bundles WHERE id = $1", [id]);
     }
 
